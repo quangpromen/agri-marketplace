@@ -1,188 +1,202 @@
-# Mộc Farm — Website Nông Nghiệp & Nông Sản Hữu Cơ Việt Nam
+<div align="center">
 
-Dự án xây dựng nền tảng website cho thương hiệu **Mộc Farm** — tiên phong trong nông nghiệp sạch, canh tác tuần hoàn bền vững và cung ứng nông sản an lành tại Việt Nam.
+# 🌱 Mộc Farm — Hệ Sinh Thái Nông Nghiệp & Nông Sản Hữu Cơ Việt Nam
 
-Website được định hình bố cục và trải nghiệm lấy cảm hứng từ cấu trúc phân cấp thông tin hiện đại của template quốc tế Agrovia, đồng thời áp dụng triệt để bộ quy chuẩn trí tuệ thiết kế **UX/UI Pro Max** kết hợp bản sắc văn hóa ruộng đồng Việt Nam.
+**"Gieo mầm xanh – Nuôi dưỡng tương lai"**
 
----
+[![Next.js](https://img.shields.io/badge/Next.js-14.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Deployed on Vercel](https://img.shields.io/badge/Vercel-Live_Demo-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://agri-marketplace.vercel.app)
 
-## 1. Mục Tiêu Dự Án
+<p align="center">
+  Nền tảng website giới thiệu thương hiệu, dịch vụ canh tác bền vững, dự án vùng trồng sinh thái và cung ứng nông sản hữu cơ chuẩn quốc tế của <strong>Mộc Farm</strong>.
+</p>
 
-- **Bản sắc thương hiệu:** Thể hiện trọn vẹn thông điệp *"Gieo mầm xanh – Nuôi dưỡng tương lai"*, mang tinh thần mộc mạc, gần gũi nhưng chuyên nghiệp và đáng tin cậy.
-- **Kiến trúc hiện đại:** Xây dựng trên nền tảng Next.js App Router chuẩn production, mã nguồn dạng React Server Components (RSC) mặc định, tối thiểu hóa JavaScript client.
-- **Trải nghiệm người dùng vượt trội:** Đạt chuẩn Accessibility WCAG 2.2 AA, thân thiện với thiết bị cảm ứng (Touch-first), tối ưu hóa Core Web Vitals (CLS < 0.1, LCP cao).
-- **Hệ thống Design System chặt chẽ:** Quản lý màu sắc và kiểu chữ qua CSS Variables và Semantic Design Tokens 3 lớp, không hard-code mã màu.
+[🌐 Xem Bản Demo Trực Tuyến (Vercel)](https://agri-marketplace.vercel.app) · [🐞 Báo Lỗi](https://github.com/quangpromen/agri-marketplace/issues) · [✨ Đề Xuất Tính Năng](https://github.com/quangpromen/agri-marketplace/issues)
 
----
-
-## 2. Công Nghệ Sử Dụng
-
-- **Framework:** Next.js (App Router, React 18)
-- **Ngôn ngữ:** TypeScript (Strict mode enabled)
-- **Styling:** Tailwind CSS kết hợp CSS Custom Properties (Variables)
-- **Icons:** Lucide React (SVG nhẹ, stroke width 1.5 - 2px đồng nhất, accessible)
-- **Class Utilities:** `clsx`, `tailwind-merge`
-- **Typography:** `Be Vietnam Pro` (tối ưu hóa 100% tiếng Việt qua `next/font/google`)
-- **Code Quality:** ESLint, Prettier, TypeScript Compiler
+</div>
 
 ---
 
-## 3. Cài Đặt & Phát Triển
+## 📖 Tổng Quan Dự Án
 
-### Yêu cầu môi trường
-- Node.js >= 18.17.0
-- npm >= 9.0.0
+**Mộc Farm** là giải pháp giao diện web hiện đại dành cho doanh nghiệp nông nghiệp sạch và chuỗi cung ứng nông sản hữu cơ tại Việt Nam. Dự án được thiết kế với ngôn ngữ thị giác mộc mạc nhưng cao cấp, tôn vinh vẻ đẹp của ruộng đồng Việt Nam kết hợp cùng kiến trúc kỹ thuật chuẩn Production trên nền tảng **Next.js 14 App Router**.
 
-### Cài đặt dependencies
-Cài đặt dependencies với cache nội bộ dự án:
-```bash
-npm install --cache .cache/npm
+### Điểm nổi bật về sản phẩm & kỹ thuật:
+- **Kiến trúc Server-First:** Ưu tiên tối đa **React Server Components (RSC)**, chỉ tách `"use client"` tại các lá tương tác (Slider, Counter, Tabs, Accordion, Drawer, Form) giúp giảm thiểu tối đa bundle size JavaScript.
+- **Trải nghiệm tương tác mượt mà:** Hero Slider toàn khung hình, hiệu ứng đếm số liệu thống kê (Counter Animation) với `IntersectionObserver`, Timeline ngang hành trình phát triển, Carousel dịch vụ & đánh giá khách hàng, Tabs dự án tiêu biểu và FAQ Accordion.
+- **Chuẩn tiếp cận WCAG 2.2 AA:** Độ tương phản màu sắc đạt chuẩn, hỗ trợ đầy đủ điều hướng bàn phím (`focus-visible`, `Escape`, `aria-expanded`, `aria-controls`), vùng chạm tối thiểu `44×44px` trên thiết bị cảm ứng và tôn trọng cấu hình `prefers-reduced-motion` của hệ điều hành.
+- **Tối ưu SEO & Core Web Vitals:** Tích hợp Metadata động theo từng trang, Open Graph, Canonical URL, cấu trúc dữ liệu **JSON-LD** (`Organization`, `LocalBusiness`, `BreadcrumbList`, `Article`), cùng `sitemap.xml` và `robots.txt` tự động.
+
+---
+
+## 🚀 Công Nghệ Sử Dụng (Tech Stack)
+
+| Danh mục | Công nghệ | Mô tả |
+| :--- | :--- | :--- |
+| **Framework** | [Next.js 14](https://nextjs.org/) | App Router, React Server Components, Static Site Generation (SSG) |
+| **Ngôn ngữ** | [TypeScript 5](https://www.typescriptlang.org/) | Kiểm tra kiểu tĩnh nghiêm ngặt (`strict: true`, 0 `any`) |
+| **Styling** | [Tailwind CSS 3.4](https://tailwindcss.com/) | Kết hợp hệ thống Semantic Design Tokens & CSS Variables |
+| **Typography** | `Be Vietnam Pro` | Tối ưu hiển thị dấu tiếng Việt qua `next/font/google` |
+| **Icons** | [Lucide React](https://lucide.dev/) | Hệ thống biểu tượng vector sắc nét, đồng nhất |
+| **Utilities** | `clsx`, `tailwind-merge` | Quản lý và hợp nhất class CSS linh hoạt |
+| **Code Quality** | ESLint, Prettier | Chuẩn hóa quy tắc code và tự động sắp xếp class Tailwind |
+| **Deployment** | [Vercel](https://vercel.com/) | CI/CD tự động từ GitHub, tối ưu hóa hình ảnh ở Edge Network |
+
+---
+
+## 🗺️ Hệ Thống Trang & Điều Hướng (Sitemap)
+
+Dự án bao gồm **21 static pages** được biên dịch sẵn (Pre-rendered SSG), đảm bảo tốc độ phản hồi tức thì:
+
+| Đường dẫn (Route) | Tên trang | Nội dung chính |
+| :--- | :--- | :--- |
+| `/` | **Trang chủ** | 14 phân khu: Hero Slider, Thống kê, Giới thiệu, Timeline lịch sử, Dịch vụ, Sứ mệnh/Tầm nhìn, Ưu thế, Dự án, FAQ, Đánh giá, Bài viết, Bản tin |
+| `/gioi-thieu` | **Giới thiệu** | Câu chuyện Mộc Farm, triết lý canh tác thuận tự nhiên, hành trình phát triển và đội ngũ nòng cốt |
+| `/dich-vu` | **Dịch vụ** | 6 giải pháp nông nghiệp bền vững, quy trình hợp tác 4 bước và câu hỏi thường gặp |
+| `/du-an` | **Dự án** | Danh mục các vùng trồng sinh thái tiêu biểu từ Đà Lạt, Mộc Châu đến Đồng bằng sông Cửu Long |
+| `/du-an/[slug]` | **Chi tiết dự án** | Thông số vùng trồng, quy mô hecta, thách thức, giải pháp kỹ thuật và kết quả thực tế |
+| `/bai-viet` | **Bài viết** | Cẩm nang kiến thức nông nghiệp hữu cơ, kỹ thuật nuôi dưỡng đất và xu hướng tiêu dùng xanh |
+| `/bai-viet/[slug]` | **Chi tiết bài viết** | Nội dung chuyên sâu kèm Schema `Article`, thông tin tác giả và gợi ý bài viết liên quan |
+| `/doi-ngu` | **Đội ngũ** | Hồ sơ các kỹ sư nông học, chuyên gia thổ nhưỡng và quản lý chất lượng tại Mộc Farm |
+| `/bang-gia` | **Bảng giá** | Các gói cung ứng nông sản định kỳ cho gia đình, chuỗi nhà hàng và gói tư vấn chuyển đổi hữu cơ |
+| `/cau-hoi-thuong-gap` | **Hỏi đáp (FAQ)** | Giải đáp chi tiết về chứng nhận hữu cơ, quy trình thu hoạch và chính sách giao nhận |
+| `/lien-he` | **Liên hệ** | Biểu mẫu liên hệ có kiểm tra dữ liệu (Validation), thông tin nông trại, hotline và giờ làm việc |
+| `/_not-found` | **Trang 404** | Giao diện điều hướng thân thiện khi đường dẫn không tồn tại |
+
+---
+
+## 🎨 Hệ Thống Thiết Kế (Design System)
+
+Bảng màu của **Mộc Farm** được lấy cảm hứng từ sắc thái tự nhiên của rừng cây, mầm non và mùa lúa chín tại Việt Nam:
+
+| Token | Mã màu (Hex) | Vai trò sử dụng |
+| :--- | :---: | :--- |
+| **Forest Green (Primary)** | `#315C3B` | Màu thương hiệu chủ đạo, tiêu đề nhấn, trạng thái active |
+| **Sprout Green (Secondary)** | `#8BAE66` | Nhãn phụ, đường viền sinh thái, thành phần bổ trợ |
+| **Harvest Gold (Accent)** | `#D9A441` | Nút hành động (CTA), huy hiệu số thứ tự, điểm nhấn tương tác |
+| **Warm Cream (Background)** | `#F7F3E8` | Nền phân khu xen kẽ mang lại cảm giác ấm áp, mộc mạc |
+| **Charcoal Dark** | `#181818` | Header khi cuộn, khối đăng ký bản tin và Footer |
+| **Deep Forest (Foreground)** | `#16251B` | Màu chữ chính đảm bảo độ tương phản cao trên nền sáng |
+
+---
+
+## 📂 Cấu Trúc Thư Mục
+
+```text
+agri-marketplace/
+├── public/
+│   └── images/                 # 37 hình ảnh nông nghiệp chất lượng cao phân theo từng phân khu
+│       ├── hero/               # Ảnh nền toàn khung cho Hero Slider
+│       ├── about/              # Ảnh thực tế nông trại và thu hoạch
+│       ├── history/            # Ảnh toàn cảnh hành trình phát triển
+│       ├── services/           # Ảnh minh họa 6 dịch vụ cốt lõi
+│       ├── features/           # Ảnh điểm nổi bật & kiểm định chất lượng
+│       ├── approach/           # Ảnh sứ mệnh & tầm nhìn canh tác
+│       ├── projects/           # Ảnh các dự án vùng trồng tiêu biểu
+│       ├── faq/                # Ảnh minh họa khu vực hỏi đáp
+│       ├── testimonials/       # Ảnh chân dung khách hàng & đối tác
+│       ├── team/               # Ảnh chân dung đội ngũ kỹ sư nông học
+│       ├── blog/               # Ảnh bìa bài viết chuyên môn
+│       └── gallery/            # Bộ sưu tập ảnh nông trại tại Footer
+├── src/
+│   ├── app/
+│   │   ├── (marketing)/        # Route group chia sẻ chung Header & Footer
+│   │   │   ├── page.tsx        # Trang chủ (14 sections)
+│   │   │   ├── gioi-thieu/     # Trang Giới thiệu
+│   │   │   ├── dich-vu/        # Trang Dịch vụ
+│   │   │   ├── du-an/          # Danh sách & chi tiết Dự án ([slug])
+│   │   │   ├── bai-viet/       # Danh sách & chi tiết Bài viết ([slug])
+│   │   │   ├── doi-ngu/        # Trang Đội ngũ chuyên gia
+│   │   │   ├── bang-gia/       # Trang Bảng giá dịch vụ & nông sản
+│   │   │   ├── cau-hoi-thuong-gap/ # Trang Câu hỏi thường gặp
+│   │   │   └── lien-he/        # Trang Liên hệ & biểu mẫu
+│   │   ├── globals.css         # CSS Variables, Design Tokens & Custom Components
+│   │   ├── layout.tsx          # Root Layout (lang="vi", Font, JSON-LD Schema)
+│   │   ├── loading.tsx         # Trạng thái tải trang
+│   │   ├── not-found.tsx       # Trang lỗi 404
+│   │   ├── robots.ts           # Cấu hình robots.txt tự động
+│   │   └── sitemap.ts          # Cấu hình sitemap.xml tự động
+│   ├── components/
+│   │   ├── layout/             # SiteHeader, MainNavigation, MobileNavigation, SiteFooter
+│   │   ├── sections/           # Các phân khu chức năng trên trang chủ & trang con
+│   │   ├── shared/             # Logo, PageHero, SectionHeading, BackToTop, JsonLd
+│   │   └── ui/                 # Các thành phần UI tái sử dụng (Button, Accordion,...)
+│   ├── config/
+│   │   ├── site.ts             # Cấu hình thương hiệu, liên hệ, mạng xã hội tập trung
+│   │   └── navigation.ts       # Cấu trúc menu điều hướng và dropdown
+│   ├── data/                   # Dữ liệu tiếng Việt chuẩn hóa kiểu tĩnh (Type-safe)
+│   ├── lib/                    # Hàm tiện ích cn(), trình tạo Metadata SEO
+│   └── types/                  # Định nghĩa toàn bộ TypeScript Interfaces
+├── .env.example                # Mẫu cấu hình biến môi trường
+├── next.config.mjs             # Cấu hình Next.js
+├── tailwind.config.ts          # Cấu hình hệ thống token Tailwind CSS
+└── tsconfig.json               # Cấu hình TypeScript
 ```
 
-### Chạy môi trường phát triển (Development)
+---
+
+## 🛠️ Hướng Dẫn Cài Đặt & Chạy Dự Án
+
+### 1. Yêu cầu hệ thống
+- **Node.js** `>= 18.17.0`
+- **npm** `>= 9.0.0`
+
+### 2. Clone dự án & cài đặt thư viện
+```bash
+git clone https://github.com/quangpromen/agri-marketplace.git
+cd agri-marketplace
+npm install
+```
+
+### 3. Thiết lập biến môi trường
+Sao chép file `.env.example` sang `.env.local`:
+```bash
+cp .env.example .env.local
+```
+Cập nhật giá trị URL trong `.env.local` (nếu cần):
+```env
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_APP_ENV=development
+```
+
+### 4. Khởi chạy môi trường phát triển (Development)
 ```bash
 npm run dev
 ```
-Truy cập ứng dụng tại: `http://localhost:3000`
+Mở trình duyệt và truy cập: `http://localhost:3000`
 
-### Kiểm tra cú pháp (Lint)
+### 5. Các lệnh kiểm tra & đóng gói Production
 ```bash
-npm run lint
-```
-
-### Kiểm tra kiểu dữ liệu tĩnh (Type-check)
-```bash
+# Kiểm tra kiểu dữ liệu TypeScript
 npm run type-check
-```
 
-### Đóng gói Production Build
-```bash
+# Kiểm tra quy tắc code với ESLint
+npm run lint
+
+# Định dạng toàn bộ mã nguồn với Prettier
+npm run format
+
+# Đóng gói bản dựng Production (SSG)
 npm run build
-```
 
-### Chạy Production Server
-```bash
+# Khởi chạy máy chủ Production
 npm run start
 ```
 
 ---
 
-## 4. Biến Môi Trường
+## ☁️ Triển Khai (Deployment)
 
-Tạo file `.env.local` từ file mẫu `.env.example`:
-```env
-NEXT_PUBLIC_SITE_URL=https://mocfarma.vn
-NEXT_PUBLIC_APP_ENV=development
-```
-
----
-
-## 5. Cấu Trúc Thư Mục Dự Án
-
-```
-agri-marketplace/
-├── .cache/                     # Local cache nội bộ
-├── public/
-│   ├── images/                 # Ảnh nông nghiệp thực tế chất lượng cao (37 ảnh phân loại theo section)
-│   │   ├── hero/               # Ảnh banner toàn cảnh slider
-│   │   ├── about/              # Ảnh giới thiệu nông trại
-│   │   ├── history/            # Ảnh toàn cảnh hành trình
-│   │   ├── services/           # Ảnh dịch vụ canh tác
-│   │   ├── features/           # Ảnh điểm nổi bật & công nghệ
-│   │   ├── approach/           # Ảnh sứ mệnh & tầm nhìn
-│   │   ├── projects/           # Ảnh dự án tiêu biểu
-│   │   ├── faq/                # Ảnh hỏi đáp nông trại
-│   │   ├── testimonials/       # Chân dung đối tác & khách hàng
-│   │   ├── team/               # Chân dung đội ngũ kỹ sư
-│   │   ├── blog/               # Ảnh cẩm nang nông nghiệp
-│   │   └── gallery/            # Ảnh lưới footer nông trại
-│   └── favicon.ico
-├── src/
-│   ├── app/
-│   │   ├── (marketing)/        # Route group tiếp thị chung layout
-│   │   │   ├── layout.tsx      # Header & Footer wrapper
-│   │   │   ├── page.tsx        # Trang chủ với 14 section skeleton
-│   │   │   ├── gioi-thieu/     # Trang giới thiệu Mộc Farm
-│   │   │   ├── dich-vu/        # Trang danh mục 6 dịch vụ cốt lõi
-│   │   │   ├── du-an/          # Danh sách & chi tiết dự án (/du-an/[slug])
-│   │   │   ├── bai-viet/       # Cẩm nang & chi tiết bài viết (/bai-viet/[slug])
-│   │   │   ├── doi-ngu/        # Đội ngũ kỹ sư nông học
-│   │   │   ├── bang-gia/       # Bảng giá gói nông sản & dịch vụ
-│   │   │   ├── cau-hoi-thuong-gap/ # FAQ accordion accessible
-│   │   │   └── lien-he/        # Form liên hệ & thông tin nông trại
-│   │   ├── globals.css         # Design tokens & CSS variables
-│   │   ├── layout.tsx          # Root layout (lang="vi", Font setup, Schema JSON-LD)
-│   │   ├── loading.tsx         # Skeleton loading toàn trang
-│   │   ├── not-found.tsx       # Trang lỗi 404 thân thiện
-│   │   ├── robots.ts           # Cấu hình tự động robots.txt
-│   │   └── sitemap.ts          # Cấu hình tự động sitemap.xml
-│   ├── components/
-│   │   ├── layout/             # SiteHeader, MainNav, MobileNav, SiteFooter
-│   │   ├── sections/           # 12 components section riêng biệt cho trang chủ
-│   │   ├── ui/                 # Atomic UI primitives: Button, Card, Badge, Accordion,...
-│   │   └── shared/             # Logo, Breadcrumb, PageHero, SocialLinks
-│   ├── config/
-│   │   ├── site.ts             # Thông tin thương hiệu, hotline, địa chỉ
-│   │   └── navigation.ts       # Cấu trúc menu điều hướng tập trung
-│   ├── data/                   # Typed mock data tiếng Việt thuần khiết
-│   │   ├── services.ts
-│   │   ├── projects.ts
-│   │   ├── posts.ts
-│   │   ├── team.ts
-│   │   ├── testimonials.ts
-│   │   ├── faqs.ts
-│   │   └── stats.ts
-│   ├── lib/
-│   │   ├── utils.ts            # Class helper cn()
-│   │   ├── metadata.ts         # SEO metadata generator helper
-│   │   └── constants.ts
-│   └── types/
-│       └── index.ts            # Định nghĩa toàn bộ TypeScript Interfaces
-├── next.config.mjs
-├── tailwind.config.ts
-├── tsconfig.json
-├── package.json
-└── README.md
-```
+Dự án được tối ưu sẵn để triển khai tức thì trên **Vercel**:
+1. Kết nối kho lưu trữ GitHub `quangpromen/agri-marketplace` vào bảng điều khiển Vercel.
+2. Thiết lập biến môi trường `NEXT_PUBLIC_SITE_URL` trỏ về tên miền chính thức trên Vercel.
+3. Mỗi khi có lệnh `git push` lên nhánh `main`, Vercel sẽ tự động kiểm tra kiểu tĩnh, biên dịch toàn bộ 21 trang tĩnh và cập nhật lên hệ thống CDN toàn cầu.
 
 ---
 
-## 6. Quy Ước Lập Trình
-
-### 6.1. Quy ước Component
-- **Server Components mặc định:** Tất cả các component trong `src/app` và `src/components/sections` là React Server Components. Không thêm `"use client"` trừ khi component cần quản lý state hoặc sự kiện tương tác (`MobileNavigation`, `Accordion`).
-- **Semantic HTML:** Đảm bảo duy nhất 1 thẻ `h1` trên mỗi trang, các section dùng `h2`, thẻ con dùng `h3`.
-- **Accessibility:**
-  - Vùng chạm (Touch target) đạt tối thiểu `44x44px` trên di động.
-  - Vòng chỉ báo bàn phím (`focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`).
-  - Biểu tượng trang trí có `aria-hidden="true"`.
-  - Icon-only button luôn có `aria-label`.
-- **Style Utility:** Dùng helper `cn(...)` từ `@/lib/utils` kết hợp `clsx` và `tailwind-merge`.
-
-### 6.2. Quy ước Thêm Dữ Liệu
-- Toàn bộ dữ liệu hiển thị được định nghĩa trong `src/data/*.ts` với kiểu dữ liệu chặt chẽ từ `src/types/index.ts`.
-- Tuyệt đối không hard-code dữ liệu nội dung, số điện thoại, email hoặc địa chỉ rải rác bên trong file JSX.
-- Khi thêm mới một dự án hoặc bài viết, chỉ cần khai báo thêm một object trong `src/data/projects.ts` hoặc `src/data/posts.ts`; hệ thống sẽ tự động sinh dynamic route, static params và sitemap.
-
----
-
-## 7. Áp Dụng Bộ Tiêu Chuẩn UX/UI Pro Max
-
-Dự án tuân thủ nghiêm ngặt các nguyên tắc thiết kế từ kho tri thức **UX/UI Pro Max**:
-1. **Accessibility (WCAG 2.2 AA):** Đảm bảo độ tương phản màu sắc $\ge 4.5:1$, hỗ trợ điều hướng bàn phím đầy đủ, tôn trọng `prefers-reduced-motion`.
-2. **Typography & Bản sắc:** Sử dụng font chữ **Be Vietnam Pro** với phân cấp kích thước, khoảng cách dòng `1.5 - 1.75` giúp trải nghiệm đọc nhẹ nhàng, dễ chịu.
-3. **Màu sắc Semantic:** Bảng màu nông nghiệp Việt Nam:
-   - Primary: `#315C3B` (Xanh lá rừng đậm)
-   - Secondary: `#8BAE66` (Xanh mầm non hữu cơ)
-   - Accent: `#D9A441` (Vàng lúa chín mùa gặt)
-   - Cream: `#F7F3E8` (Be ấm mộc mạc)
-   - Foreground: `#16251B` (Xanh đen tự nhiên tương phản cao)
-
----
-
-## 8. Quy Tắc Bảo Vệ Repository Kỹ Năng Local
-
-- Thư mục kỹ năng `E:\RepoSkill` được quản lý ở chế độ **Read-Only**.
-- Dự án không thực thi bất kỳ script nào gây ảnh hưởng hoặc ghi đè ra ngoài phạm vi thư mục hiện tại (`E:\Code\agri-marketplace`).
-- Không có bất kỳ dependency hoặc package nào được cài đặt ở chế độ toàn cục (global). Toàn bộ thư viện và cache lưu trữ cục bộ bên trong thư mục dự án.
-
+<div align="center">
+  <p>Phát triển với tâm huyết vì nền nông nghiệp xanh bền vững Việt Nam — <strong>Mộc Farm</strong> © 2026</p>
+</div>
