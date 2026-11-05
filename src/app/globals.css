@@ -1,0 +1,376 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Mộc Farm Semantic Color Palette */
+    /* Primary: Xanh lá rừng tự nhiên (#315C3B) */
+    --primary: 134 30% 28%;
+    --primary-foreground: 45 43% 98%;
+    --primary-light: 112 24% 45%;
+    --primary-dark: 135 35% 20%;
+
+    /* Secondary: Xanh mầm non (#8BAE66) */
+    --secondary: 89 31% 54%;
+    --secondary-foreground: 140 25% 12%;
+
+    /* Accent: Vàng lúa chín (#D9A441) */
+    --accent: 39 67% 55%;
+    --accent-foreground: 140 25% 12%;
+    --accent-dark: 38 70% 45%;
+
+    /* Cream / Background warm (#F7F3E8 / #F5EEE7) */
+    --cream: 44 43% 94%;
+    --cream-foreground: 140 25% 12%;
+
+    /* Main Background & Foreground */
+    --background: 44 43% 98%;
+    --foreground: 140 25% 12%;
+
+    /* Card & Popover */
+    --card: 0 0% 100%;
+    --card-foreground: 140 25% 12%;
+
+    /* Muted Text & Background */
+    --muted: 44 26% 90%;
+    --muted-foreground: 137 9% 43%;
+
+    /* Border & Ring */
+    --border: 44 20% 86%;
+    --input: 44 20% 86%;
+    --ring: 134 30% 28%;
+
+    /* Destructive */
+    --destructive: 17 88% 40%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Radius */
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  body {
+    @apply flex min-h-screen flex-col bg-background font-sans text-foreground antialiased selection:bg-accent/30 selection:text-foreground;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-bold tracking-tight text-foreground;
+  }
+}
+
+/* ==========================================================================
+   Custom Components & Animations
+   ========================================================================== */
+
+/* 1. Signature Button (.btn-custom) */
+.btn-custom {
+  position: relative;
+  height: 50px;
+  padding: 0 26px 0 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border-radius: 9999px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-custom::before {
+  position: absolute;
+  content: "→";
+  top: 50%;
+  left: 6px;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.btn-custom:hover {
+  padding: 0 56px 0 26px;
+}
+
+.btn-custom:hover::before {
+  left: calc(100% - 44px);
+}
+
+/* Button color variants */
+.btn-custom-gold {
+  background-color: #d9a441;
+  color: #181818;
+}
+.btn-custom-gold::before {
+  background-color: #ffffff;
+  color: #181818;
+}
+.btn-custom-gold:hover {
+  background-color: #c69231;
+}
+
+.btn-custom-green {
+  background-color: #315c3b;
+  color: #ffffff;
+}
+.btn-custom-green::before {
+  background-color: #d9a441;
+  color: #181818;
+}
+.btn-custom-green:hover {
+  background-color: #26492f;
+}
+
+.btn-custom-white {
+  background-color: #ffffff;
+  color: #181818;
+}
+.btn-custom-white::before {
+  background-color: #d9a441;
+  color: #181818;
+}
+.btn-custom-white:hover {
+  background-color: #f7f3e8;
+}
+
+/* 2. Service Item Hover Effect */
+.service-item {
+  position: relative;
+  overflow: hidden;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  transition: all 0.5s ease;
+  z-index: 1;
+}
+
+.service-item::after {
+  position: absolute;
+  content: "";
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  background-color: #315c3b;
+  border-radius: 1rem;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: -1;
+}
+
+.service-item:hover::after {
+  height: 100%;
+}
+
+.service-item:hover h4,
+.service-item:hover p,
+.service-item:hover span {
+  color: #ffffff !important;
+}
+
+.service-item img {
+  filter: blur(2px);
+  transition: all 0.5s ease;
+}
+
+.service-item:hover img {
+  filter: blur(0);
+}
+
+.service-item:hover .service-badge {
+  background-color: #d9a441 !important;
+  color: #181818 !important;
+}
+
+.service-item:hover .btn-custom-gold {
+  background-color: #ffffff !important;
+  color: #181818 !important;
+}
+.service-item:hover .btn-custom-gold::before {
+  background-color: #d9a441 !important;
+  color: #ffffff !important;
+}
+
+/* 3. Blog Item Hover Effect */
+.blog-item {
+  position: relative;
+  overflow: hidden;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  transition: all 0.5s ease;
+  z-index: 1;
+}
+
+.blog-item::after {
+  position: absolute;
+  content: "";
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+  background-color: #315c3b;
+  border-radius: 1rem;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: -1;
+}
+
+.blog-item:hover::after {
+  height: 100%;
+}
+
+.blog-item:hover a,
+.blog-item:hover span,
+.blog-item:hover p {
+  color: #ffffff !important;
+}
+
+.blog-item img {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.blog-item:hover img {
+  transform: scale(1.08);
+}
+
+/* 4. Team Item Hover Effect */
+.team-item {
+  position: relative;
+  overflow: hidden;
+  background-color: #ffffff;
+  border-radius: 1rem;
+  transition: all 0.5s ease;
+  z-index: 1;
+}
+
+.team-item::after {
+  position: absolute;
+  content: "";
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  background-color: #315c3b;
+  border-radius: 1rem;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: -1;
+}
+
+.team-item:hover::after {
+  height: 100%;
+}
+
+.team-item:hover h4,
+.team-item:hover h5,
+.team-item:hover span,
+.team-item:hover p {
+  color: #ffffff !important;
+}
+
+/* 5. Section Heading Helper */
+.section-title {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+/* 6. Timeline (.history-item) */
+.history-item {
+  padding: 85px 24px 60px 24px;
+  border-left: 2px solid #d9a441;
+  position: relative;
+  height: 100%;
+}
+
+.history-item::before {
+  position: absolute;
+  content: "";
+  width: 14px;
+  height: 14px;
+  top: -7px;
+  left: -8px;
+  border-radius: 50%;
+  background-color: #d9a441;
+}
+
+.history-item .history-date {
+  position: absolute;
+  top: 30px;
+  left: -20px;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  color: #181818;
+  background-color: #ffffff;
+  border: 2px solid #d9a441;
+  font-weight: 700;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.history-item .history-number {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  bottom: 0;
+  left: -21px;
+  border-radius: 50%;
+  color: #181818;
+  background-color: #ffffff;
+  border: 2px solid #d9a441;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.history-item:hover .history-date,
+.history-item.active .history-date,
+.history-item:hover .history-number,
+.history-item.active .history-number {
+  background-color: #d9a441;
+  color: #181818;
+}
+
+/* 7. Focus Utility */
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
