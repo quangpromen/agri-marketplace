@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { CheckCircle2, Send, ShieldCheck } from "lucide-react";
-import { initialContactFormState, submitContact } from "@/actions/submit-contact";
+import { submitContact, type ContactFormState } from "@/actions/submit-contact";
 import { Button } from "@/components/ui/button";
 
 const initialValues = {
@@ -12,6 +12,10 @@ const initialValues = {
   email: "",
   service: "hop-rau-tuan",
   message: "",
+};
+
+const initialContactFormState: ContactFormState = {
+  status: "idle",
 };
 
 function ContactSubmitButton() {

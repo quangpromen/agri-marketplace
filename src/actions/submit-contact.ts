@@ -13,10 +13,6 @@ export type ContactFormState = {
   fieldErrors?: Partial<Record<ContactFieldName, string[]>>;
 };
 
-export const initialContactFormState: ContactFormState = {
-  status: "idle",
-};
-
 function getFormValue(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
