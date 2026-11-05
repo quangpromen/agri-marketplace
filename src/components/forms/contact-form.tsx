@@ -1,32 +1,58 @@
 "use client";
 
-import React, { useState } from "react";
-import { Send, ShieldCheck, CheckCircle2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useFormState, useFormStatus } from "react-dom";
+import { CheckCircle2, Send, ShieldCheck } from "lucide-react";
+import { initialContactFormState, submitContact } from "@/actions/submit-contact";
 import { Button } from "@/components/ui/button";
 
+const initialValues = {
+  name: "",
+  phone: "",
+  email: "",
+  service: "hop-rau-tuan",
+  message: "",
+};
+
+function ContactSubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      type="submit"
+      variant="default"
+      size="lg"
+      disabled={pending}
+      className="w-full gap-2 font-bold"
+    >
+      <Send className="h-4 w-4" aria-hidden="true" />
+      <span>{pending ? "Đang gửi thông tin..." : "Gửi thông tin liên hệ"}</span>
+    </Button>
+  );
+}
+
 export function ContactForm() {
-  const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    service: "hop-rau-tuan",
-    message: "",
-  });
+  const [state, formAction] = useFormState(submitContact, initialContactFormState);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [formData, setFormData] = useState(initialValues);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
-  };
+  useEffect(() => {
+    if (state.status === "success") {
+      setShowSuccess(true);
+    }
+  }, [state.status]);
 
-  if (submitted) {
+  if (showSuccess) {
     return (
-      <div className="space-y-3 rounded-2xl border border-primary/20 bg-primary/10 p-8 text-center">
+      <div
+        className="space-y-3 rounded-2xl border border-primary/20 bg-primary/10 p-8 text-center"
+        role="status"
+      >
         <CheckCircle2 className="mx-auto h-12 w-12 text-primary" aria-hidden="true" />
         <h4 className="text-xl font-bold text-foreground">Gửi Tin Nhắn Thành Công!</h4>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">
-          Cảm ơn bạn {formData.name || ""}. Đội ngũ kỹ sư Mộc Farm đã nhận được yêu cầu và sẽ liên
-          hệ lại qua số điện thoại sớm nhất có thể.
+          Cảm ơn bạn {state.submittedName ?? ""}. Đội ngũ kỹ sư Mộc Farm đã nhận được yêu cầu và sẽ
+          liên hệ lại qua số điện thoại sớm nhất có thể.
         </p>
         <div className="pt-2">
           <Button
@@ -34,8 +60,8 @@ export function ContactForm() {
             variant="outline"
             size="sm"
             onClick={() => {
-              setSubmitted(false);
-              setFormData({ name: "", phone: "", email: "", service: "hop-rau-tuan", message: "" });
+              setFormData(initialValues);
+              setShowSuccess(false);
             }}
           >
             Gửi yêu cầu khác
@@ -45,63 +71,91 @@ export function ContactForm() {
     );
   }
 
+  const fieldErrors = state.fieldErrors ?? {};
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" aria-label="Biểu mẫu liên hệ Mộc Farm">
+    <form
+      action={formAction}
+      className="space-y-4"
+      aria-label="Biểu mẫu liên hệ Mộc Farm"
+      noValidate
+    >
+      <div aria-live="polite">
+        {state.status === "error" && state.message ? (
+          <p
+            className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {state.message}
+          </p>
+        ) : null}
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <label htmlFor="contact-name" className="text-xs font-semibold text-foreground">
-            Họ và tên của bạn <span className="text-destructive">*</span>
-          </label>
+        <FormField
+          error={fieldErrors.name?.[0]}
+          id="contact-name"
+          label="Họ và tên của bạn"
+          required
+        >
           <input
             id="contact-name"
+            name="name"
             type="text"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(event) => setFormData({ ...formData, name: event.target.value })}
             placeholder="Nguyễn Văn A"
-            required
+            autoComplete="name"
+            aria-invalid={Boolean(fieldErrors.name?.length)}
+            aria-describedby={fieldErrors.name ? "contact-name-error" : undefined}
             className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground"
           />
-        </div>
+        </FormField>
 
-        <div className="space-y-1.5">
-          <label htmlFor="contact-phone" className="text-xs font-semibold text-foreground">
-            Số điện thoại liên hệ <span className="text-destructive">*</span>
-          </label>
+        <FormField
+          error={fieldErrors.phone?.[0]}
+          id="contact-phone"
+          label="Số điện thoại liên hệ"
+          required
+        >
           <input
             id="contact-phone"
+            name="phone"
             type="tel"
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
             placeholder="0912 345 678"
-            required
+            autoComplete="tel"
+            aria-invalid={Boolean(fieldErrors.phone?.length)}
+            aria-describedby={fieldErrors.phone ? "contact-phone-error" : undefined}
             className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground"
           />
-        </div>
+        </FormField>
       </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor="contact-email" className="text-xs font-semibold text-foreground">
-          Địa chỉ email <span className="text-destructive">*</span>
-        </label>
+      <FormField error={fieldErrors.email?.[0]} id="contact-email" label="Địa chỉ email" required>
         <input
           id="contact-email"
+          name="email"
           type="email"
           value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          onChange={(event) => setFormData({ ...formData, email: event.target.value })}
           placeholder="email@example.com"
-          required
+          autoComplete="email"
+          aria-invalid={Boolean(fieldErrors.email?.length)}
+          aria-describedby={fieldErrors.email ? "contact-email-error" : undefined}
           className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3.5 text-sm text-foreground placeholder:text-muted-foreground"
         />
-      </div>
+      </FormField>
 
-      <div className="space-y-1.5">
-        <label htmlFor="contact-service" className="text-xs font-semibold text-foreground">
-          Chủ đề bạn quan tâm
-        </label>
+      <FormField error={fieldErrors.service?.[0]} id="contact-service" label="Chủ đề bạn quan tâm">
         <select
           id="contact-service"
+          name="service"
           value={formData.service}
-          onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+          onChange={(event) => setFormData({ ...formData, service: event.target.value })}
+          aria-invalid={Boolean(fieldErrors.service?.length)}
+          aria-describedby={fieldErrors.service ? "contact-service-error" : undefined}
           className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3.5 text-sm text-foreground"
         >
           <option value="hop-rau-tuan">Mua nông sản / Hộp rau gia đình</option>
@@ -110,28 +164,34 @@ export function ContactForm() {
           <option value="tham-quan-nong-trai">Đặt lịch tham quan trải nghiệm nông trại</option>
           <option value="khac">Chủ đề khác</option>
         </select>
-      </div>
+      </FormField>
 
-      <div className="space-y-1.5">
-        <label htmlFor="contact-message" className="text-xs font-semibold text-foreground">
-          Nội dung tin nhắn <span className="text-destructive">*</span>
-        </label>
+      <FormField
+        error={fieldErrors.message?.[0]}
+        id="contact-message"
+        label="Nội dung tin nhắn"
+        required
+      >
         <textarea
           id="contact-message"
+          name="message"
           rows={4}
           value={formData.message}
-          onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+          onChange={(event) => setFormData({ ...formData, message: event.target.value })}
           placeholder="Hãy chia sẻ nhu cầu hoặc câu hỏi cụ thể của bạn..."
-          required
+          aria-invalid={Boolean(fieldErrors.message?.length)}
+          aria-describedby={fieldErrors.message ? "contact-message-error" : undefined}
           className="focus-ring w-full resize-y rounded-lg border border-border bg-background p-3.5 text-sm text-foreground placeholder:text-muted-foreground"
         />
+      </FormField>
+
+      <div className="sr-only" aria-hidden="true">
+        <label htmlFor="contact-website">Website</label>
+        <input id="contact-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
       </div>
 
       <div className="pt-2">
-        <Button type="submit" variant="default" size="lg" className="w-full gap-2 font-bold">
-          <Send className="h-4 w-4" aria-hidden="true" />
-          <span>Gửi thông tin liên hệ</span>
-        </Button>
+        <ContactSubmitButton />
       </div>
 
       <div className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-muted-foreground">
@@ -139,5 +199,33 @@ export function ContactForm() {
         <span>Mộc Farm cam kết bảo mật tuyệt đối thông tin liên hệ của bạn.</span>
       </div>
     </form>
+  );
+}
+
+function FormField({
+  children,
+  error,
+  id,
+  label,
+  required = false,
+}: {
+  children: React.ReactNode;
+  error?: string;
+  id: string;
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="text-xs font-semibold text-foreground">
+        {label} {required ? <span className="text-destructive">*</span> : null}
+      </label>
+      {children}
+      {error ? (
+        <p id={`${id}-error`} className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
