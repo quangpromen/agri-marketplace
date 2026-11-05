@@ -3,6 +3,7 @@
 import { db } from "@/db/client";
 import { newsletterSubscribers } from "@/db/schema";
 import { newsletterSubscriptionSchema } from "@/schemas/newsletter";
+import { sendNewsletterConfirmationEmail } from "@/server/email";
 
 type NewsletterFieldName = "email" | "website";
 
@@ -66,10 +67,6 @@ export async function subscribeNewsletter(
           updatedAt: now,
         },
       });
-
-    return {
-      status: "success",
-    };
   } catch (error) {
     console.error("Unable to save newsletter subscription", error);
 
@@ -78,4 +75,14 @@ export async function subscribeNewsletter(
       message: "Không thể đăng ký nhận tin lúc này. Vui lòng thử lại sau ít phút.",
     };
   }
+
+  try {
+    await sendNewsletterConfirmationEmail(result.data.email);
+  } catch (emailError) {
+    console.error("Unable to send newsletter confirmation email", emailError);
+  }
+
+  return {
+    status: "success",
+  };
 }

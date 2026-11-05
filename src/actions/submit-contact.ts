@@ -1,8 +1,10 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contactSubmissions } from "@/db/schema";
 import { contactSubmissionSchema } from "@/schemas/contact";
+import { sendContactEmails } from "@/server/email";
 
 type ContactFieldName = "name" | "phone" | "email" | "service" | "message" | "website";
 
@@ -53,19 +55,21 @@ export async function submitContact(
     };
   }
 
-  try {
-    await db.insert(contactSubmissions).values({
-      name: result.data.name,
-      phone: result.data.phone,
-      email: result.data.email,
-      service: result.data.service,
-      message: result.data.message,
-    });
+  let submissionId: string;
 
-    return {
-      status: "success",
-      submittedName: result.data.name,
-    };
+  try {
+    const [submission] = await db
+      .insert(contactSubmissions)
+      .values({
+        name: result.data.name,
+        phone: result.data.phone,
+        email: result.data.email,
+        service: result.data.service,
+        message: result.data.message,
+      })
+      .returning({ id: contactSubmissions.id });
+
+    submissionId = submission.id;
   } catch (error) {
     console.error("Unable to save contact submission", error);
 
@@ -74,4 +78,36 @@ export async function submitContact(
       message: "Không thể gửi yêu cầu lúc này. Vui lòng thử lại sau ít phút.",
     };
   }
+
+  let nextEmailStatus: "sent" | "failed" = "sent";
+
+  try {
+    await sendContactEmails({
+      name: result.data.name,
+      phone: result.data.phone,
+      email: result.data.email,
+      service: result.data.service,
+      message: result.data.message,
+    });
+  } catch (emailError) {
+    nextEmailStatus = "failed";
+    console.error("Unable to send contact submission emails", emailError);
+  }
+
+  try {
+    await db
+      .update(contactSubmissions)
+      .set({
+        emailStatus: nextEmailStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(contactSubmissions.id, submissionId));
+  } catch (statusError) {
+    console.error("Unable to update contact submission email status", statusError);
+  }
+
+  return {
+    status: "success",
+    submittedName: result.data.name,
+  };
 }
