@@ -79,7 +79,10 @@ export async function subscribeNewsletter(
   try {
     await sendNewsletterConfirmationEmail(result.data.email);
   } catch (emailError) {
-    console.error("Unable to send newsletter confirmation email", emailError);
+    console.error(
+      "Unable to send newsletter confirmation email:",
+      emailError instanceof Error ? emailError.message : "Unknown email error"
+    );
   }
 
   return {

@@ -1,10 +1,6 @@
 import { siteConfig } from "@/config/site";
 import type { ContactSubmissionInput } from "@/schemas/contact";
-import {
-  getContactNotificationEmail,
-  getResendClient,
-  getResendFromEmail,
-} from "./client";
+import { getContactNotificationEmail, sendEmail } from "./client";
 
 export type ContactEmailPayload = Omit<ContactSubmissionInput, "website">;
 
@@ -32,8 +28,6 @@ function getServiceLabel(service: ContactSubmissionInput["service"]): string {
 export async function sendContactNotificationEmail(
   payload: ContactEmailPayload
 ): Promise<void> {
-  const resend = getResendClient();
-  const from = getResendFromEmail();
   const to = getContactNotificationEmail();
   const serviceLabel = getServiceLabel(payload.service);
 
@@ -43,8 +37,7 @@ export async function sendContactNotificationEmail(
   const safeService = escapeHtml(serviceLabel);
   const safeMessage = escapeHtml(payload.message).replace(/\r?\n/g, "<br />");
 
-  const { error } = await resend.emails.send({
-    from,
+  await sendEmail({
     to,
     replyTo: payload.email,
     subject: `[${siteConfig.name}] Liên hệ mới từ ${payload.name} - ${serviceLabel}`,
@@ -88,25 +81,18 @@ export async function sendContactNotificationEmail(
       </div>
     `,
   });
-
-  if (error) {
-    throw new Error(`Resend contact notification error: ${error.message}`);
-  }
 }
 
 export async function sendContactConfirmationEmail(
   payload: ContactEmailPayload
 ): Promise<void> {
-  const resend = getResendClient();
-  const from = getResendFromEmail();
   const serviceLabel = getServiceLabel(payload.service);
 
   const safeName = escapeHtml(payload.name);
   const safePhone = escapeHtml(payload.phone);
   const safeService = escapeHtml(serviceLabel);
 
-  const { error } = await resend.emails.send({
-    from,
+  await sendEmail({
     to: payload.email,
     subject: `${siteConfig.name} đã nhận được yêu cầu liên hệ của bạn`,
     text: [
@@ -139,10 +125,6 @@ export async function sendContactConfirmationEmail(
       </div>
     `,
   });
-
-  if (error) {
-    throw new Error(`Resend contact confirmation error: ${error.message}`);
-  }
 }
 
 export async function sendContactEmails(payload: ContactEmailPayload): Promise<void> {
@@ -154,7 +136,7 @@ export async function sendContactEmails(payload: ContactEmailPayload): Promise<v
   const errors = results
     .filter((result): result is PromiseRejectedResult => result.status === "rejected")
     .map((result) =>
-      result.reason instanceof Error ? result.reason.message : String(result.reason)
+      result.reason instanceof Error ? result.reason.message : "Email delivery failed"
     );
 
   if (errors.length > 0) {
@@ -163,11 +145,7 @@ export async function sendContactEmails(payload: ContactEmailPayload): Promise<v
 }
 
 export async function sendNewsletterConfirmationEmail(email: string): Promise<void> {
-  const resend = getResendClient();
-  const from = getResendFromEmail();
-
-  const { error } = await resend.emails.send({
-    from,
+  await sendEmail({
     to: email,
     subject: `Xác nhận đăng ký bản tin ${siteConfig.name}`,
     text: [
@@ -194,9 +172,4 @@ export async function sendNewsletterConfirmationEmail(email: string): Promise<vo
       </div>
     `,
   });
-
-  if (error) {
-    throw new Error(`Resend newsletter confirmation error: ${error.message}`);
-  }
 }
-

@@ -91,7 +91,10 @@ export async function submitContact(
     });
   } catch (emailError) {
     nextEmailStatus = "failed";
-    console.error("Unable to send contact submission emails", emailError);
+    console.error(
+      "Unable to send contact submission emails:",
+      emailError instanceof Error ? emailError.message : "Unknown email error"
+    );
   }
 
   try {
@@ -103,7 +106,10 @@ export async function submitContact(
       })
       .where(eq(contactSubmissions.id, submissionId));
   } catch (statusError) {
-    console.error("Unable to update contact submission email status", statusError);
+    console.error(
+      "Unable to update contact submission email status:",
+      statusError instanceof Error ? statusError.message : "Unknown database error"
+    );
   }
 
   return {

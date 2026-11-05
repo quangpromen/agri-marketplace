@@ -2,6 +2,14 @@ import { Resend } from "resend";
 
 let resendClient: Resend | null = null;
 
+export type SendEmailParams = {
+  to: string | string[];
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+};
+
 export function getResendClient(): Resend {
   const apiKey = process.env.RESEND_API_KEY?.trim();
 
@@ -36,3 +44,20 @@ export function getContactNotificationEmail(): string {
   return notificationEmail;
 }
 
+export async function sendEmail(params: SendEmailParams): Promise<void> {
+  const resend = getResendClient();
+  const from = getResendFromEmail();
+
+  const { error } = await resend.emails.send({
+    from,
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+    text: params.text,
+    ...(params.replyTo ? { replyTo: params.replyTo } : {}),
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
