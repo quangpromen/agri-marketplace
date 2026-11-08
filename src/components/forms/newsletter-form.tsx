@@ -3,10 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Check, Send } from "lucide-react";
-import {
-  subscribeNewsletter,
-  type NewsletterFormState,
-} from "@/actions/subscribe-newsletter";
+import { subscribeNewsletter, type NewsletterFormState } from "@/actions/subscribe-newsletter";
 import { TurnstileField } from "@/components/forms/turnstile-field";
 
 const initialNewsletterFormState: NewsletterFormState = { status: "idle" };
@@ -18,9 +15,7 @@ function NewsletterSubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      aria-label={
-        pending ? "Đang gửi đăng ký nhận tin" : "Gửi đăng ký nhận tin"
-      }
+      aria-label={pending ? "Đang gửi đăng ký nhận tin" : "Gửi đăng ký nhận tin"}
       className="focus-ring absolute right-2 top-1.5 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-accent text-dark shadow-md transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-70 sm:right-2 sm:top-2 sm:h-12 sm:w-12"
     >
       <Send className="h-5 w-5 text-dark" aria-hidden="true" />
@@ -29,10 +24,7 @@ function NewsletterSubmitButton() {
 }
 
 export function NewsletterForm() {
-  const [state, formAction] = useFormState(
-    subscribeNewsletter,
-    initialNewsletterFormState
-  );
+  const [state, formAction] = useFormState(subscribeNewsletter, initialNewsletterFormState);
   const [email, setEmail] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -47,9 +39,7 @@ export function NewsletterForm() {
         role="status"
       >
         <Check className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
-        <span>
-          Cảm ơn bạn! Mộc Farm sẽ gửi bản tin mùa vụ định kỳ đến bạn.
-        </span>
+        <span>Cảm ơn bạn! Mộc Farm sẽ gửi bản tin mùa vụ định kỳ đến bạn.</span>
       </div>
     );
   }
@@ -100,7 +90,7 @@ export function NewsletterForm() {
             {emailError}
           </p>
         ) : null}
-        {state.status === "error" && state.message ? (
+        {(state.status === "error" || state.status === "rate_limited") && state.message ? (
           <p className="mt-2 text-sm text-red-200" role="alert">
             {state.message}
           </p>
@@ -110,7 +100,9 @@ export function NewsletterForm() {
       <TurnstileField
         error={turnstileError}
         resetSignal={
-          state.status === "validation_error" || state.status === "error"
+          state.status === "validation_error" ||
+          state.status === "rate_limited" ||
+          state.status === "error"
             ? state
             : null
         }

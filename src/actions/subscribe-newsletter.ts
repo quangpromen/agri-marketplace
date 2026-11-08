@@ -4,15 +4,13 @@ import { db } from "@/db/client";
 import { newsletterSubscribers } from "@/db/schema";
 import { newsletterSubscriptionSchema } from "@/schemas/newsletter";
 import { sendNewsletterConfirmationEmail } from "@/server/email";
-import {
-  TURNSTILE_TOKEN_FIELD,
-  verifyTurnstileToken,
-} from "@/server/security/verify-turnstile";
+import { checkFormRateLimit } from "@/server/security/rate-limit";
+import { TURNSTILE_TOKEN_FIELD, verifyTurnstileToken } from "@/server/security/verify-turnstile";
 
 type NewsletterFieldName = "email" | "website" | "turnstileToken";
 
 export type NewsletterFormState = {
-  status: "idle" | "success" | "validation_error" | "error";
+  status: "idle" | "success" | "validation_error" | "rate_limited" | "error";
   message?: string;
   fieldErrors?: Partial<Record<NewsletterFieldName, string[]>>;
 };
@@ -23,20 +21,17 @@ function getFormValue(formData: FormData, key: string): string {
 }
 
 function getFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
-  return issues.reduce<Partial<Record<NewsletterFieldName, string[]>>>(
-    (errors, issue) => {
-      const field = issue.path[0];
+  return issues.reduce<Partial<Record<NewsletterFieldName, string[]>>>((errors, issue) => {
+    const field = issue.path[0];
 
-      if (typeof field !== "string") {
-        return errors;
-      }
-
-      const typedField = field as NewsletterFieldName;
-      errors[typedField] = [...(errors[typedField] ?? []), issue.message];
+    if (typeof field !== "string") {
       return errors;
-    },
-    {}
-  );
+    }
+
+    const typedField = field as NewsletterFieldName;
+    errors[typedField] = [...(errors[typedField] ?? []), issue.message];
+    return errors;
+  }, {});
 }
 
 export async function subscribeNewsletter(
@@ -52,6 +47,15 @@ export async function subscribeNewsletter(
       fieldErrors: {
         website: ["Yêu cầu không hợp lệ."],
       },
+    };
+  }
+
+  const rateLimit = await checkFormRateLimit("newsletter");
+
+  if (!rateLimit.success) {
+    return {
+      status: "rate_limited",
+      message: rateLimit.message,
     };
   }
 
@@ -104,8 +108,7 @@ export async function subscribeNewsletter(
 
     return {
       status: "error",
-      message:
-        "Không thể đăng ký nhận tin lúc này. Vui lòng thử lại sau ít phút.",
+      message: "Không thể đăng ký nhận tin lúc này. Vui lòng thử lại sau ít phút.",
     };
   }
 

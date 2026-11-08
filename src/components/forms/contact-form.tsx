@@ -86,7 +86,7 @@ export function ContactForm() {
       noValidate
     >
       <div aria-live="polite">
-        {state.status === "error" && state.message ? (
+        {(state.status === "error" || state.status === "rate_limited") && state.message ? (
           <p
             className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
             role="alert"
@@ -198,7 +198,9 @@ export function ContactForm() {
       <TurnstileField
         error={fieldErrors.turnstileToken?.[0]}
         resetSignal={
-          state.status === "validation_error" || state.status === "error"
+          state.status === "validation_error" ||
+          state.status === "rate_limited" ||
+          state.status === "error"
             ? state
             : null
         }

@@ -5,22 +5,14 @@ import { db } from "@/db/client";
 import { contactSubmissions } from "@/db/schema";
 import { contactSubmissionSchema } from "@/schemas/contact";
 import { sendContactEmails } from "@/server/email";
-import {
-  TURNSTILE_TOKEN_FIELD,
-  verifyTurnstileToken,
-} from "@/server/security/verify-turnstile";
+import { checkFormRateLimit } from "@/server/security/rate-limit";
+import { TURNSTILE_TOKEN_FIELD, verifyTurnstileToken } from "@/server/security/verify-turnstile";
 
 type ContactFieldName =
-  | "name"
-  | "phone"
-  | "email"
-  | "service"
-  | "message"
-  | "website"
-  | "turnstileToken";
+  "name" | "phone" | "email" | "service" | "message" | "website" | "turnstileToken";
 
 export type ContactFormState = {
-  status: "idle" | "success" | "validation_error" | "error";
+  status: "idle" | "success" | "validation_error" | "rate_limited" | "error";
   message?: string;
   submittedName?: string;
   fieldErrors?: Partial<Record<ContactFieldName, string[]>>;
@@ -32,20 +24,17 @@ function getFormValue(formData: FormData, key: string): string {
 }
 
 function getFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
-  return issues.reduce<Partial<Record<ContactFieldName, string[]>>>(
-    (errors, issue) => {
-      const field = issue.path[0];
+  return issues.reduce<Partial<Record<ContactFieldName, string[]>>>((errors, issue) => {
+    const field = issue.path[0];
 
-      if (typeof field !== "string") {
-        return errors;
-      }
-
-      const typedField = field as ContactFieldName;
-      errors[typedField] = [...(errors[typedField] ?? []), issue.message];
+    if (typeof field !== "string") {
       return errors;
-    },
-    {}
-  );
+    }
+
+    const typedField = field as ContactFieldName;
+    errors[typedField] = [...(errors[typedField] ?? []), issue.message];
+    return errors;
+  }, {});
 }
 
 export async function submitContact(
@@ -61,6 +50,15 @@ export async function submitContact(
       fieldErrors: {
         website: ["Yêu cầu không hợp lệ."],
       },
+    };
+  }
+
+  const rateLimit = await checkFormRateLimit("contact");
+
+  if (!rateLimit.success) {
+    return {
+      status: "rate_limited",
+      message: rateLimit.message,
     };
   }
 
@@ -147,9 +145,7 @@ export async function submitContact(
   } catch (statusError) {
     console.error(
       "Unable to update contact submission email status:",
-      statusError instanceof Error
-        ? statusError.message
-        : "Unknown database error"
+      statusError instanceof Error ? statusError.message : "Unknown database error"
     );
   }
 
