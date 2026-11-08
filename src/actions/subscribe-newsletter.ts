@@ -4,8 +4,12 @@ import { db } from "@/db/client";
 import { newsletterSubscribers } from "@/db/schema";
 import { newsletterSubscriptionSchema } from "@/schemas/newsletter";
 import { sendNewsletterConfirmationEmail } from "@/server/email";
+import {
+  TURNSTILE_TOKEN_FIELD,
+  verifyTurnstileToken,
+} from "@/server/security/verify-turnstile";
 
-type NewsletterFieldName = "email" | "website";
+type NewsletterFieldName = "email" | "website" | "turnstileToken";
 
 export type NewsletterFormState = {
   status: "idle" | "success" | "validation_error" | "error";
@@ -19,26 +23,54 @@ function getFormValue(formData: FormData, key: string): string {
 }
 
 function getFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
-  return issues.reduce<Partial<Record<NewsletterFieldName, string[]>>>((errors, issue) => {
-    const field = issue.path[0];
+  return issues.reduce<Partial<Record<NewsletterFieldName, string[]>>>(
+    (errors, issue) => {
+      const field = issue.path[0];
 
-    if (typeof field !== "string") {
+      if (typeof field !== "string") {
+        return errors;
+      }
+
+      const typedField = field as NewsletterFieldName;
+      errors[typedField] = [...(errors[typedField] ?? []), issue.message];
       return errors;
-    }
-
-    const typedField = field as NewsletterFieldName;
-    errors[typedField] = [...(errors[typedField] ?? []), issue.message];
-    return errors;
-  }, {});
+    },
+    {}
+  );
 }
 
 export async function subscribeNewsletter(
   _previousState: NewsletterFormState,
   formData: FormData
 ): Promise<NewsletterFormState> {
+  const website = getFormValue(formData, "website");
+
+  if (website.trim().length > 0) {
+    return {
+      status: "validation_error",
+      message: "Yêu cầu không hợp lệ.",
+      fieldErrors: {
+        website: ["Yêu cầu không hợp lệ."],
+      },
+    };
+  }
+
+  const turnstileToken = getFormValue(formData, TURNSTILE_TOKEN_FIELD);
+  const turnstileVerification = await verifyTurnstileToken(turnstileToken);
+
+  if (!turnstileVerification.success) {
+    return {
+      status: "validation_error",
+      message: turnstileVerification.message,
+      fieldErrors: {
+        turnstileToken: [turnstileVerification.message],
+      },
+    };
+  }
+
   const result = newsletterSubscriptionSchema.safeParse({
     email: getFormValue(formData, "email"),
-    website: getFormValue(formData, "website"),
+    website,
   });
 
   if (!result.success) {
@@ -72,7 +104,8 @@ export async function subscribeNewsletter(
 
     return {
       status: "error",
-      message: "Không thể đăng ký nhận tin lúc này. Vui lòng thử lại sau ít phút.",
+      message:
+        "Không thể đăng ký nhận tin lúc này. Vui lòng thử lại sau ít phút.",
     };
   }
 

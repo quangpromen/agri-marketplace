@@ -5,8 +5,19 @@ import { db } from "@/db/client";
 import { contactSubmissions } from "@/db/schema";
 import { contactSubmissionSchema } from "@/schemas/contact";
 import { sendContactEmails } from "@/server/email";
+import {
+  TURNSTILE_TOKEN_FIELD,
+  verifyTurnstileToken,
+} from "@/server/security/verify-turnstile";
 
-type ContactFieldName = "name" | "phone" | "email" | "service" | "message" | "website";
+type ContactFieldName =
+  | "name"
+  | "phone"
+  | "email"
+  | "service"
+  | "message"
+  | "website"
+  | "turnstileToken";
 
 export type ContactFormState = {
   status: "idle" | "success" | "validation_error" | "error";
@@ -21,30 +32,58 @@ function getFormValue(formData: FormData, key: string): string {
 }
 
 function getFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
-  return issues.reduce<Partial<Record<ContactFieldName, string[]>>>((errors, issue) => {
-    const field = issue.path[0];
+  return issues.reduce<Partial<Record<ContactFieldName, string[]>>>(
+    (errors, issue) => {
+      const field = issue.path[0];
 
-    if (typeof field !== "string") {
+      if (typeof field !== "string") {
+        return errors;
+      }
+
+      const typedField = field as ContactFieldName;
+      errors[typedField] = [...(errors[typedField] ?? []), issue.message];
       return errors;
-    }
-
-    const typedField = field as ContactFieldName;
-    errors[typedField] = [...(errors[typedField] ?? []), issue.message];
-    return errors;
-  }, {});
+    },
+    {}
+  );
 }
 
 export async function submitContact(
   _previousState: ContactFormState,
   formData: FormData
 ): Promise<ContactFormState> {
+  const website = getFormValue(formData, "website");
+
+  if (website.trim().length > 0) {
+    return {
+      status: "validation_error",
+      message: "Yêu cầu không hợp lệ.",
+      fieldErrors: {
+        website: ["Yêu cầu không hợp lệ."],
+      },
+    };
+  }
+
+  const turnstileToken = getFormValue(formData, TURNSTILE_TOKEN_FIELD);
+  const turnstileVerification = await verifyTurnstileToken(turnstileToken);
+
+  if (!turnstileVerification.success) {
+    return {
+      status: "validation_error",
+      message: turnstileVerification.message,
+      fieldErrors: {
+        turnstileToken: [turnstileVerification.message],
+      },
+    };
+  }
+
   const result = contactSubmissionSchema.safeParse({
     name: getFormValue(formData, "name"),
     phone: getFormValue(formData, "phone"),
     email: getFormValue(formData, "email"),
     service: getFormValue(formData, "service"),
     message: getFormValue(formData, "message"),
-    website: getFormValue(formData, "website"),
+    website,
   });
 
   if (!result.success) {
@@ -108,7 +147,9 @@ export async function submitContact(
   } catch (statusError) {
     console.error(
       "Unable to update contact submission email status:",
-      statusError instanceof Error ? statusError.message : "Unknown database error"
+      statusError instanceof Error
+        ? statusError.message
+        : "Unknown database error"
     );
   }
 

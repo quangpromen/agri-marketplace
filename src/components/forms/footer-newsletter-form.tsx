@@ -3,7 +3,11 @@
 import React, { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { ArrowRight, Check } from "lucide-react";
-import { subscribeNewsletter, type NewsletterFormState } from "@/actions/subscribe-newsletter";
+import {
+  subscribeNewsletter,
+  type NewsletterFormState,
+} from "@/actions/subscribe-newsletter";
+import { TurnstileField } from "@/components/forms/turnstile-field";
 import { Button } from "@/components/ui/button";
 
 const initialNewsletterFormState: NewsletterFormState = { status: "idle" };
@@ -26,7 +30,10 @@ function FooterNewsletterSubmitButton() {
 }
 
 export function FooterNewsletterForm() {
-  const [state, formAction] = useFormState(subscribeNewsletter, initialNewsletterFormState);
+  const [state, formAction] = useFormState(
+    subscribeNewsletter,
+    initialNewsletterFormState
+  );
   const [email, setEmail] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -40,13 +47,17 @@ export function FooterNewsletterForm() {
         className="flex items-center gap-2 rounded-lg bg-white/10 p-3 text-xs text-cream"
         role="status"
       >
-        <Check className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
+        <Check
+          className="h-4 w-4 shrink-0 text-secondary"
+          aria-hidden="true"
+        />
         <span>Cảm ơn bạn đã đăng ký nhận tin!</span>
       </div>
     );
   }
 
   const emailError = state.fieldErrors?.email?.[0];
+  const turnstileError = state.fieldErrors?.turnstileToken?.[0];
 
   return (
     <form
@@ -77,6 +88,7 @@ export function FooterNewsletterForm() {
           </p>
         ) : null}
       </div>
+
       <div className="sr-only" aria-hidden="true">
         <label htmlFor="footer-newsletter-website">Website</label>
         <input
@@ -87,7 +99,21 @@ export function FooterNewsletterForm() {
           autoComplete="off"
         />
       </div>
+
+      <TurnstileField
+        error={turnstileError}
+        resetSignal={
+          state.status === "validation_error" || state.status === "error"
+            ? state
+            : null
+        }
+        size="compact"
+        theme="dark"
+        tone="dark"
+      />
+
       <FooterNewsletterSubmitButton />
+
       <div aria-live="polite">
         {state.status === "error" && state.message ? (
           <p className="text-xs text-red-200" role="alert">

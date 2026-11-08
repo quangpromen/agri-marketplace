@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { CheckCircle2, Send, ShieldCheck } from "lucide-react";
 import { submitContact, type ContactFormState } from "@/actions/submit-contact";
+import { TurnstileField } from "@/components/forms/turnstile-field";
 import { Button } from "@/components/ui/button";
 
 const initialValues = {
@@ -193,6 +194,17 @@ export function ContactForm() {
         <label htmlFor="contact-website">Website</label>
         <input id="contact-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
       </div>
+
+      <TurnstileField
+        error={fieldErrors.turnstileToken?.[0]}
+        resetSignal={
+          state.status === "validation_error" || state.status === "error"
+            ? state
+            : null
+        }
+        theme="light"
+        tone="light"
+      />
 
       <div className="pt-2">
         <ContactSubmitButton />
