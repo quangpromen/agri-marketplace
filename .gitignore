@@ -5,9 +5,12 @@ node_modules/
 
 # Testing
 coverage/
+playwright-report/
+test-results/
 
 # Next.js
 .next/
+.next-e2e/
 out/
 build/
 dist/
@@ -30,7 +33,6 @@ dist/
 
 # Vercel
 .vercel
-coverage
 
 # TypeScript
 *.tsbuildinfo

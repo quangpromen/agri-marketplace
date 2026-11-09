@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import { constructMetadata } from "@/lib/metadata";
 import { siteConfig } from "@/config/site";
@@ -12,6 +12,11 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = constructMetadata();
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export default function RootLayout({
   children,
@@ -43,14 +48,14 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="vi" className={beVietnamPro.variable}>
+    <html lang="vi" className={`${beVietnamPro.variable} overflow-x-hidden`}>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-secondary/30 selection:text-foreground">
+      <body className="min-h-screen overflow-x-hidden bg-background font-sans text-foreground antialiased selection:bg-secondary/30 selection:text-foreground">
         {/* Skip to main content link for keyboard accessibility */}
         <a
           href="#main-content"

@@ -114,6 +114,7 @@ export function HeroSection() {
                 <div className="pt-2">
                   <Link
                     href={slide.ctaHref}
+                    tabIndex={isActive ? undefined : -1}
                     className="btn-custom btn-custom-gold inline-flex text-base font-bold text-dark shadow-2xl"
                   >
                     {slide.ctaText}
