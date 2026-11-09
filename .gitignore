@@ -30,6 +30,7 @@ dist/
 
 # Vercel
 .vercel
+coverage
 
 # TypeScript
 *.tsbuildinfo
