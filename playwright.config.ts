@@ -41,8 +41,8 @@ export default defineConfig({
       UPSTASH_REDIS_REST_URL: "",
       UPSTASH_REDIS_REST_TOKEN: "",
       RATE_LIMIT_IP_SALT: "",
-      DATABASE_URL: "",
-      RESEND_API_KEY: "",
+      DATABASE_URL: "postgresql://test:test@127.0.0.1:5432/test",
+      RESEND_API_KEY: "re_test_ci_only",
     },
   },
 });
