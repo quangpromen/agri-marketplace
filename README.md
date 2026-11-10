@@ -8,13 +8,13 @@
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Deployed on Vercel](https://img.shields.io/badge/Vercel-Live_Demo-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://agri-marketplace.vercel.app)
+[![Deployed on Vercel](https://img.shields.io/badge/Vercel-Production-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://agri-marketplace-1c8g018pj.vercel.app/)
 
 <p align="center">
   Nền tảng website giới thiệu thương hiệu, dịch vụ canh tác bền vững, dự án vùng trồng sinh thái và cung ứng nông sản hữu cơ chuẩn quốc tế của <strong>Mộc Farm</strong>.
 </p>
 
-[🌐 Xem Bản Demo Trực Tuyến (Vercel)](https://agri-marketplace.vercel.app) · [🐞 Báo Lỗi](https://github.com/quangpromen/agri-marketplace/issues) · [✨ Đề Xuất Tính Năng](https://github.com/quangpromen/agri-marketplace/issues)
+[🌐 Truy Cập Production (Vercel)](https://agri-marketplace-1c8g018pj.vercel.app/) · [🐞 Báo Lỗi](https://github.com/quangpromen/agri-marketplace/issues) · [✨ Đề Xuất Tính Năng](https://github.com/quangpromen/agri-marketplace/issues)
 
 </div>
 
@@ -29,6 +29,10 @@
 - **Trải nghiệm tương tác mượt mà:** Hero Slider toàn khung hình, hiệu ứng đếm số liệu thống kê (Counter Animation) với `IntersectionObserver`, Timeline ngang hành trình phát triển, Carousel dịch vụ & đánh giá khách hàng, Tabs dự án tiêu biểu và FAQ Accordion.
 - **Chuẩn tiếp cận WCAG 2.2 AA:** Độ tương phản màu sắc đạt chuẩn, hỗ trợ đầy đủ điều hướng bàn phím (`focus-visible`, `Escape`, `aria-expanded`, `aria-controls`), vùng chạm tối thiểu `44×44px` trên thiết bị cảm ứng và tôn trọng cấu hình `prefers-reduced-motion` của hệ điều hành.
 - **Tối ưu SEO & Core Web Vitals:** Tích hợp Metadata động theo từng trang, Open Graph, Canonical URL, cấu trúc dữ liệu **JSON-LD** (`Organization`, `LocalBusiness`, `BreadcrumbList`, `Article`), cùng `sitemap.xml` và `robots.txt` tự động.
+- **Biểu mẫu Production hoàn chỉnh:** Form liên hệ và đăng ký bản tin dùng **Server Actions**, kiểm tra dữ liệu với **Zod**, lưu trên **Neon PostgreSQL** qua **Drizzle ORM** và gửi email bằng **Resend**.
+- **Bảo mật nhiều lớp:** Cloudflare Turnstile, honeypot chống bot và rate limiting phân tán bằng **Upstash Redis**; địa chỉ IP được băm với salt trước khi dùng làm khóa giới hạn.
+- **Quan sát & đo lường:** Theo dõi lỗi bảo vệ dữ liệu nhạy cảm bằng **Sentry**, kết hợp **Vercel Analytics** và **Speed Insights** để giám sát trải nghiệm thực tế.
+- **Kiểm thử tự động:** Unit test bằng **Vitest**; E2E và accessibility test bằng **Playwright** trên desktop lẫn mobile, sẵn sàng chạy trong CI.
 
 ---
 
@@ -42,6 +46,11 @@
 | **Typography** | `Be Vietnam Pro` | Tối ưu hiển thị dấu tiếng Việt qua `next/font/google` |
 | **Icons** | [Lucide React](https://lucide.dev/) | Hệ thống biểu tượng vector sắc nét, đồng nhất |
 | **Utilities** | `clsx`, `tailwind-merge` | Quản lý và hợp nhất class CSS linh hoạt |
+| **Database / ORM** | Neon PostgreSQL, Drizzle ORM | Lưu yêu cầu liên hệ và danh sách đăng ký nhận tin |
+| **Email** | Resend | Gửi thông báo liên hệ và email xác nhận đăng ký |
+| **Security** | Cloudflare Turnstile, Upstash Redis, Zod | Chống bot, rate limit và xác thực dữ liệu phía server |
+| **Observability** | Sentry, Vercel Analytics, Speed Insights | Theo dõi lỗi, lưu lượng và hiệu năng thực tế |
+| **Testing** | Vitest, Playwright, axe-core | Unit, E2E, responsive và accessibility testing |
 | **Code Quality** | ESLint, Prettier | Chuẩn hóa quy tắc code và tự động sắp xếp class Tailwind |
 | **Deployment** | [Vercel](https://vercel.com/) | CI/CD tự động từ GitHub, tối ưu hóa hình ảnh ở Edge Network |
 
@@ -120,6 +129,7 @@ agri-marketplace/
 │   │   ├── robots.ts           # Cấu hình robots.txt tự động
 │   │   └── sitemap.ts          # Cấu hình sitemap.xml tự động
 │   ├── components/
+│   │   ├── forms/              # Form liên hệ/newsletter và tích hợp Turnstile
 │   │   ├── layout/             # SiteHeader, MainNavigation, MobileNavigation, SiteFooter
 │   │   ├── sections/           # Các phân khu chức năng trên trang chủ & trang con
 │   │   ├── shared/             # Logo, PageHero, SectionHeading, BackToTop, JsonLd
@@ -128,11 +138,25 @@ agri-marketplace/
 │   │   ├── site.ts             # Cấu hình thương hiệu, liên hệ, mạng xã hội tập trung
 │   │   └── navigation.ts       # Cấu trúc menu điều hướng và dropdown
 │   ├── data/                   # Dữ liệu tiếng Việt chuẩn hóa kiểu tĩnh (Type-safe)
+│   ├── actions/                # Server Actions xử lý liên hệ và đăng ký nhận tin
+│   ├── db/                     # Drizzle client và schema PostgreSQL
 │   ├── lib/                    # Hàm tiện ích cn(), trình tạo Metadata SEO
+│   ├── schemas/                # Zod schemas cho dữ liệu biểu mẫu
+│   ├── server/                 # Email, rate limit, Turnstile và observability
 │   └── types/                  # Định nghĩa toàn bộ TypeScript Interfaces
+├── drizzle/                    # SQL migration và metadata của Drizzle
+├── scripts/                    # Script migration database và tạo placeholder
+├── tests/
+│   ├── unit/                   # Unit test cho actions, schema, security, Sentry
+│   └── e2e/                    # Playwright test cho form và accessibility
+├── instrumentation.ts          # Khởi tạo Sentry theo runtime
+├── instrumentation-client.ts   # Khởi tạo Sentry phía trình duyệt
 ├── .env.example                # Mẫu cấu hình biến môi trường
+├── drizzle.config.ts           # Cấu hình Drizzle Kit
 ├── next.config.mjs             # Cấu hình Next.js
+├── playwright.config.ts        # Cấu hình E2E desktop/mobile
 ├── tailwind.config.ts          # Cấu hình hệ thống token Tailwind CSS
+├── vitest.config.mts           # Cấu hình unit test và coverage
 └── tsconfig.json               # Cấu hình TypeScript
 ```
 
@@ -156,25 +180,57 @@ Sao chép file `.env.example` sang `.env.local`:
 ```bash
 cp .env.example .env.local
 ```
-Cập nhật giá trị URL trong `.env.local` (nếu cần):
+Cập nhật các dịch vụ cần dùng trong `.env.local`:
 ```env
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_APP_ENV=development
+
+DATABASE_URL=postgresql://user:password@host/neondb?sslmode=require
+
+RESEND_API_KEY=re_your_api_key
+RESEND_FROM_EMAIL="Moc Farm <noreply@your-domain.com>"
+CONTACT_NOTIFICATION_EMAIL=admin@your-domain.com
+
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your_site_key
+TURNSTILE_SECRET_KEY=your_secret_key
+
+UPSTASH_REDIS_REST_URL=https://your-database.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_rest_token
+RATE_LIMIT_IP_SALT=generate_a_random_32_byte_hex_secret
+
+NEXT_PUBLIC_SENTRY_DSN=https://public-key@o0.ingest.sentry.io/0
+SENTRY_DSN=https://public-key@o0.ingest.sentry.io/0
+SENTRY_ENVIRONMENT=development
 ```
 
-### 4. Khởi chạy môi trường phát triển (Development)
+Xem [`.env.example`](./.env.example) để biết đầy đủ biến môi trường, bao gồm cấu hình upload source map Sentry cho CI/Vercel.
+
+### 4. Khởi tạo cơ sở dữ liệu
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+### 5. Khởi chạy môi trường phát triển (Development)
 ```bash
 npm run dev
 ```
 Mở trình duyệt và truy cập: `http://localhost:3000`
 
-### 5. Các lệnh kiểm tra & đóng gói Production
+### 6. Các lệnh kiểm tra & đóng gói Production
 ```bash
 # Kiểm tra kiểu dữ liệu TypeScript
 npm run type-check
 
 # Kiểm tra quy tắc code với ESLint
 npm run lint
+
+# Chạy unit test và báo cáo coverage
+npm test
+npm run test:coverage
+
+# Chạy E2E/accessibility test trên desktop và mobile
+npm run test:e2e
 
 # Định dạng toàn bộ mã nguồn với Prettier
 npm run format
@@ -192,8 +248,11 @@ npm run start
 
 Dự án được tối ưu sẵn để triển khai tức thì trên **Vercel**:
 1. Kết nối kho lưu trữ GitHub `quangpromen/agri-marketplace` vào bảng điều khiển Vercel.
-2. Thiết lập biến môi trường `NEXT_PUBLIC_SITE_URL` trỏ về tên miền chính thức trên Vercel.
-3. Mỗi khi có lệnh `git push` lên nhánh `main`, Vercel sẽ tự động kiểm tra kiểu tĩnh, biên dịch toàn bộ 21 trang tĩnh và cập nhật lên hệ thống CDN toàn cầu.
+2. Thiết lập `NEXT_PUBLIC_SITE_URL=https://agri-marketplace-1c8g018pj.vercel.app` cùng các biến Neon, Resend, Turnstile, Upstash và Sentry trong **Environment Variables**.
+3. Chạy migration Drizzle trên database Production trước khi mở form cho người dùng.
+4. Mỗi khi có lệnh `git push` lên nhánh `main`, workflow CI kiểm tra type, lint, unit test, build và Playwright; Vercel sau đó cập nhật deployment Production.
+
+**Production:** [https://agri-marketplace-1c8g018pj.vercel.app/](https://agri-marketplace-1c8g018pj.vercel.app/)
 
 ---
 
