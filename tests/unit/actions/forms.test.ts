@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   newsletterUpsert: vi.fn(),
   updateSet: vi.fn(),
   updateWhere: vi.fn(),
+  captureOperationalError: vi.fn(),
+}));
+
+vi.mock("@/server/observability/capture-error", () => ({
+  captureOperationalError: mocks.captureOperationalError,
 }));
 
 vi.mock("@/server/security/rate-limit", () => ({
@@ -65,6 +70,7 @@ describe("form Server Actions", () => {
     mocks.verifyTurnstile.mockReset().mockResolvedValue({ success: true });
     mocks.sendContactEmails.mockReset().mockResolvedValue(undefined);
     mocks.sendNewsletterEmail.mockReset().mockResolvedValue(undefined);
+    mocks.captureOperationalError.mockReset();
 
     mocks.contactReturning.mockReset().mockResolvedValue([{ id: "contact-id" }]);
     mocks.contactValues.mockReset().mockReturnValue({ returning: mocks.contactReturning });
@@ -137,6 +143,10 @@ describe("form Server Actions", () => {
     );
     expect(mocks.updateSet).toHaveBeenCalledWith(
       expect.objectContaining({ emailStatus: "failed" })
+    );
+    expect(mocks.captureOperationalError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ service: "resend", form: "contact" })
     );
   });
 

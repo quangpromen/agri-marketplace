@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { contactSubmissions } from "@/db/schema";
 import { contactSubmissionSchema } from "@/schemas/contact";
 import { sendContactEmails } from "@/server/email";
+import { captureOperationalError } from "@/server/observability/capture-error";
 import { checkFormRateLimit } from "@/server/security/rate-limit";
 import { TURNSTILE_TOKEN_FIELD, verifyTurnstileToken } from "@/server/security/verify-turnstile";
 
@@ -108,6 +109,11 @@ export async function submitContact(
 
     submissionId = submission.id;
   } catch (error) {
+    captureOperationalError(error, {
+      service: "neon",
+      operation: "insert_contact_submission",
+      form: "contact",
+    });
     console.error("Unable to save contact submission", error);
 
     return {
@@ -128,6 +134,11 @@ export async function submitContact(
     });
   } catch (emailError) {
     nextEmailStatus = "failed";
+    captureOperationalError(emailError, {
+      service: "resend",
+      operation: "send_contact_emails",
+      form: "contact",
+    });
     console.error(
       "Unable to send contact submission emails:",
       emailError instanceof Error ? emailError.message : "Unknown email error"
@@ -143,6 +154,11 @@ export async function submitContact(
       })
       .where(eq(contactSubmissions.id, submissionId));
   } catch (statusError) {
+    captureOperationalError(statusError, {
+      service: "neon",
+      operation: "update_contact_email_status",
+      form: "contact",
+    });
     console.error(
       "Unable to update contact submission email status:",
       statusError instanceof Error ? statusError.message : "Unknown database error"

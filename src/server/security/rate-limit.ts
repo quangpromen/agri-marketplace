@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
+import { captureOperationalError } from "@/server/observability/capture-error";
 
 type FormRateLimitScope = "contact" | "newsletter";
 
@@ -102,6 +103,11 @@ export async function checkFormRateLimit(scope: FormRateLimitScope): Promise<For
     const result = await limiters[scope].limit(getRateLimitIdentifier(scope));
 
     if (result.reason === "timeout") {
+      captureOperationalError(new Error("Upstash rate limit check timed out"), {
+        service: "upstash",
+        operation: "check_form_rate_limit",
+        form: scope,
+      });
       console.warn("Rate limit check timed out; allowing the request.");
       return { success: true };
     }
@@ -117,7 +123,12 @@ export async function checkFormRateLimit(scope: FormRateLimitScope): Promise<For
       retryAfterSeconds,
       message: getRateLimitMessage(retryAfterSeconds),
     };
-  } catch {
+  } catch (error) {
+    captureOperationalError(error, {
+      service: "upstash",
+      operation: "check_form_rate_limit",
+      form: scope,
+    });
     console.error("Unable to check the form rate limit; allowing the request.");
     return { success: true };
   }

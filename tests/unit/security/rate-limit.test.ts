@@ -4,6 +4,11 @@ const mocks = vi.hoisted(() => ({
   limit: vi.fn(),
   headersGet: vi.fn(),
   redisConstructor: vi.fn(),
+  captureOperationalError: vi.fn(),
+}));
+
+vi.mock("@/server/observability/capture-error", () => ({
+  captureOperationalError: mocks.captureOperationalError,
 }));
 
 vi.mock("next/headers", () => ({
@@ -31,6 +36,7 @@ describe("checkFormRateLimit", () => {
     mocks.limit.mockReset();
     mocks.headersGet.mockReset();
     mocks.redisConstructor.mockReset();
+    mocks.captureOperationalError.mockReset();
     mocks.headersGet.mockImplementation((name: string) =>
       name === "x-forwarded-for" ? "203.0.113.10, 10.0.0.1" : null
     );
@@ -50,6 +56,7 @@ describe("checkFormRateLimit", () => {
     const { checkFormRateLimit } = await import("@/server/security/rate-limit");
 
     await expect(checkFormRateLimit("contact")).resolves.toEqual({ success: true });
+    expect(mocks.captureOperationalError).not.toHaveBeenCalled();
     expect(mocks.limit).toHaveBeenCalledWith(expect.stringMatching(/^contact:[a-f0-9]{64}$/));
     expect(mocks.limit.mock.calls[0][0]).not.toContain("203.0.113.10");
   });
@@ -76,6 +83,10 @@ describe("checkFormRateLimit", () => {
     const { checkFormRateLimit } = await import("@/server/security/rate-limit");
 
     await expect(checkFormRateLimit("contact")).resolves.toEqual({ success: true });
+    expect(mocks.captureOperationalError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ service: "upstash", form: "contact" })
+    );
   });
 
   it("fail-open khi Upstash ném lỗi", async () => {

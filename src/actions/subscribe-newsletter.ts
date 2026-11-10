@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { newsletterSubscribers } from "@/db/schema";
 import { newsletterSubscriptionSchema } from "@/schemas/newsletter";
 import { sendNewsletterConfirmationEmail } from "@/server/email";
+import { captureOperationalError } from "@/server/observability/capture-error";
 import { checkFormRateLimit } from "@/server/security/rate-limit";
 import { TURNSTILE_TOKEN_FIELD, verifyTurnstileToken } from "@/server/security/verify-turnstile";
 
@@ -104,6 +105,11 @@ export async function subscribeNewsletter(
         },
       });
   } catch (error) {
+    captureOperationalError(error, {
+      service: "neon",
+      operation: "upsert_newsletter_subscription",
+      form: "newsletter",
+    });
     console.error("Unable to save newsletter subscription", error);
 
     return {
@@ -115,6 +121,11 @@ export async function subscribeNewsletter(
   try {
     await sendNewsletterConfirmationEmail(result.data.email);
   } catch (emailError) {
+    captureOperationalError(emailError, {
+      service: "resend",
+      operation: "send_newsletter_confirmation",
+      form: "newsletter",
+    });
     console.error(
       "Unable to send newsletter confirmation email:",
       emailError instanceof Error ? emailError.message : "Unknown email error"

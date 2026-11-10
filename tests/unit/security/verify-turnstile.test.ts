@@ -1,9 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ captureOperationalError: vi.fn() }));
+
+vi.mock("@/server/observability/capture-error", () => ({
+  captureOperationalError: mocks.captureOperationalError,
+}));
+
 import { verifyTurnstileToken } from "@/server/security/verify-turnstile";
 
 describe("verifyTurnstileToken", () => {
   beforeEach(() => {
     process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    mocks.captureOperationalError.mockReset();
   });
 
   afterEach(() => {
@@ -79,5 +87,9 @@ describe("verifyTurnstileToken", () => {
       success: false,
       code: "verification_unavailable",
     });
+    expect(mocks.captureOperationalError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ service: "turnstile" })
+    );
   });
 });

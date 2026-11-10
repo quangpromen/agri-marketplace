@@ -1,5 +1,6 @@
-const TURNSTILE_VERIFY_ENDPOINT =
-  "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+import { captureOperationalError } from "@/server/observability/capture-error";
+
+const TURNSTILE_VERIFY_ENDPOINT = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const TURNSTILE_VERIFY_TIMEOUT_MS = 8000;
 
 export const TURNSTILE_TOKEN_FIELD = "turnstileToken";
@@ -46,16 +47,12 @@ export async function verifyTurnstileToken(
     return {
       success: false,
       code: "config_error",
-      message:
-        "Hệ thống xác minh bảo mật chưa sẵn sàng. Vui lòng thử lại sau ít phút.",
+      message: "Hệ thống xác minh bảo mật chưa sẵn sàng. Vui lòng thử lại sau ít phút.",
     };
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(
-    () => controller.abort(),
-    TURNSTILE_VERIFY_TIMEOUT_MS
-  );
+  const timeoutId = setTimeout(() => controller.abort(), TURNSTILE_VERIFY_TIMEOUT_MS);
 
   try {
     const body = new URLSearchParams({
@@ -74,14 +71,15 @@ export async function verifyTurnstileToken(
     });
 
     if (!response.ok) {
-      console.error(
-        `Cloudflare Turnstile siteverify returned HTTP ${response.status}.`
-      );
+      captureOperationalError(new Error(`Cloudflare Turnstile returned HTTP ${response.status}`), {
+        service: "turnstile",
+        operation: "verify_token",
+      });
+      console.error(`Cloudflare Turnstile siteverify returned HTTP ${response.status}.`);
       return {
         success: false,
         code: "verification_unavailable",
-        message:
-          "Không thể xác minh bảo mật lúc này. Vui lòng thử lại sau ít phút.",
+        message: "Không thể xác minh bảo mật lúc này. Vui lòng thử lại sau ít phút.",
       };
     }
 
@@ -93,28 +91,28 @@ export async function verifyTurnstileToken(
       };
     }
 
-    const errorCodes = Array.isArray(data["error-codes"])
-      ? data["error-codes"]
-      : [];
+    const errorCodes = Array.isArray(data["error-codes"]) ? data["error-codes"] : [];
 
     if (errorCodes.includes("timeout-or-duplicate")) {
       return {
         success: false,
         code: "expired_or_duplicate",
-        message:
-          "Phiên xác minh bảo mật đã hết hạn. Vui lòng thực hiện xác minh lại.",
+        message: "Phiên xác minh bảo mật đã hết hạn. Vui lòng thực hiện xác minh lại.",
       };
     }
 
     return {
       success: false,
       code: "invalid_token",
-      message:
-        "Xác minh bảo mật không thành công. Vui lòng thử lại bước xác minh.",
+      message: "Xác minh bảo mật không thành công. Vui lòng thử lại bước xác minh.",
     };
   } catch (error) {
-    const isAbortError =
-      error instanceof Error && error.name === "AbortError";
+    const isAbortError = error instanceof Error && error.name === "AbortError";
+
+    captureOperationalError(error, {
+      service: "turnstile",
+      operation: "verify_token",
+    });
 
     console.error(
       isAbortError
@@ -125,11 +123,9 @@ export async function verifyTurnstileToken(
     return {
       success: false,
       code: "verification_unavailable",
-      message:
-        "Không thể kết nối dịch vụ xác minh bảo mật. Vui lòng thử lại sau ít phút.",
+      message: "Không thể kết nối dịch vụ xác minh bảo mật. Vui lòng thử lại sau ít phút.",
     };
   } finally {
     clearTimeout(timeoutId);
   }
 }
-
