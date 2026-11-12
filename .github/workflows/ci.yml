@@ -14,9 +14,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
   NEXT_TELEMETRY_DISABLED: "1"
   NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3100"
+  BETTER_AUTH_SECRET: "ci_test_only_placeholder_secret_minimum_32_chars"
+  BETTER_AUTH_URL: "http://127.0.0.1:3100"
   DATABASE_URL: "postgresql://test:test@127.0.0.1:5432/test"
   RESEND_API_KEY: "re_test_ci_only"
   RESEND_FROM_EMAIL: "Moc Farm CI <onboarding@resend.dev>"

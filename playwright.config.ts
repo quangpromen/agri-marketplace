@@ -36,6 +36,8 @@ export default defineConfig({
       ...process.env,
       PLAYWRIGHT_TEST: "1",
       NEXT_PUBLIC_SITE_URL: baseURL,
+      BETTER_AUTH_SECRET: "ci_test_only_placeholder_secret_minimum_32_chars",
+      BETTER_AUTH_URL: baseURL,
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
       TURNSTILE_SECRET_KEY: "",
       UPSTASH_REDIS_REST_URL: "",

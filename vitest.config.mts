@@ -5,6 +5,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "server-only": fileURLToPath(
+        new URL("./node_modules/server-only/empty.js", import.meta.url)
+      ),
     },
   },
   test: {
@@ -18,7 +21,8 @@ export default defineConfig({
       reportsDirectory: "coverage",
       include: [
         "src/schemas/**/*.ts",
-        "src/actions/{submit-contact,subscribe-newsletter}.ts",
+        "src/actions/{submit-contact,subscribe-newsletter,admin-auth}.ts",
+        "src/server/auth/**/*.ts",
         "src/server/security/**/*.ts",
       ],
       exclude: ["**/*.d.ts"],

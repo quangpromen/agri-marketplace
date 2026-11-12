@@ -39,4 +39,27 @@ describe("scrubSentryEvent", () => {
 
     expect(result.request?.url).toBe("/lien-he");
   });
+
+  it("ẩn mật khẩu, session token, cookie và secret khỏi message và exception", () => {
+    const result = scrubSentryEvent({
+      type: undefined,
+      message:
+        "Auth failed: password=SuperSecretPassword123! session_token=tok_abc123456 cookie=better-auth.session_token=xyz987",
+      exception: {
+        values: [
+          {
+            type: "Error",
+            value:
+              "Header authorization=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 BETTER_AUTH_SECRET=my_super_secret_key_32_chars",
+          },
+        ],
+      },
+    });
+
+    expect(result.message).not.toContain("SuperSecretPassword123!");
+    expect(result.message).not.toContain("tok_abc123456");
+    expect(result.message).not.toContain("xyz987");
+    expect(result.exception?.values?.[0]?.value).not.toContain("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+    expect(result.exception?.values?.[0]?.value).not.toContain("my_super_secret_key_32_chars");
+  });
 });
