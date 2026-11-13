@@ -1,16 +1,8 @@
 import { siteConfig } from "@/config/site";
-import type { ContactSubmissionInput } from "@/schemas/contact";
+import { getContactServiceLabel, type ContactSubmissionInput } from "@/schemas/contact";
 import { getContactNotificationEmail, sendEmail } from "./client";
 
 export type ContactEmailPayload = Omit<ContactSubmissionInput, "website">;
-
-const contactServiceLabels: Record<ContactSubmissionInput["service"], string> = {
-  "hop-rau-tuan": "Mua nông sản / Hộp rau gia đình",
-  "cung-ung-bep-an": "Cung ứng cho nhà hàng / Siêu thị",
-  "chuyen-giao-ky-thuat": "Tư vấn chuyển giao kỹ thuật canh tác",
-  "tham-quan-nong-trai": "Đặt lịch tham quan trải nghiệm nông trại",
-  khac: "Chủ đề khác",
-};
 
 function escapeHtml(value: string): string {
   return value
@@ -21,15 +13,11 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function getServiceLabel(service: ContactSubmissionInput["service"]): string {
-  return contactServiceLabels[service] ?? service;
-}
-
 export async function sendContactNotificationEmail(
   payload: ContactEmailPayload
 ): Promise<void> {
   const to = getContactNotificationEmail();
-  const serviceLabel = getServiceLabel(payload.service);
+  const serviceLabel = getContactServiceLabel(payload.service);
 
   const safeName = escapeHtml(payload.name);
   const safePhone = escapeHtml(payload.phone);
@@ -86,7 +74,7 @@ export async function sendContactNotificationEmail(
 export async function sendContactConfirmationEmail(
   payload: ContactEmailPayload
 ): Promise<void> {
-  const serviceLabel = getServiceLabel(payload.service);
+  const serviceLabel = getContactServiceLabel(payload.service);
 
   const safeName = escapeHtml(payload.name);
   const safePhone = escapeHtml(payload.phone);

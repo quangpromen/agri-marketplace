@@ -8,6 +8,22 @@ export const contactServiceValues = [
   "khac",
 ] as const;
 
+export type ContactServiceValue = (typeof contactServiceValues)[number];
+
+export const contactServiceLabels: Record<ContactServiceValue, string> = {
+  "hop-rau-tuan": "Mua nông sản / Hộp rau gia đình",
+  "cung-ung-bep-an": "Cung ứng cho nhà hàng / Siêu thị",
+  "chuyen-giao-ky-thuat": "Tư vấn chuyển giao kỹ thuật canh tác",
+  "tham-quan-nong-trai": "Đặt lịch tham quan trải nghiệm nông trại",
+  khac: "Chủ đề khác",
+};
+
+export function getContactServiceLabel(service: string): string {
+  return Object.prototype.hasOwnProperty.call(contactServiceLabels, service)
+    ? contactServiceLabels[service as ContactServiceValue]
+    : service;
+}
+
 const vietnamesePhonePattern = /^(?:\+?84|0)(?:3|5|7|8|9)\d{8}$/;
 
 export const contactSubmissionSchema = z.object({

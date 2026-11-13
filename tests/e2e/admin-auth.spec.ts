@@ -13,6 +13,21 @@ test.describe("xác thực trang quản trị", () => {
     ).toBeVisible();
   });
 
+  test("người dùng chưa đăng nhập truy cập /admin/lien-he và /admin/lien-he/[id] bị chuyển hướng về /admin/login", async ({
+    page,
+  }) => {
+    for (const protectedPath of [
+      "/admin/lien-he",
+      "/admin/lien-he/550e8400-e29b-41d4-a716-446655440000",
+    ]) {
+      await page.goto(protectedPath, { waitUntil: "domcontentloaded" });
+      await expect(page).toHaveURL(/\/admin\/login$/);
+      await expect(
+        page.getByRole("heading", { name: "Đăng nhập quản trị" })
+      ).toBeVisible();
+    }
+  });
+
   test("trang đăng nhập hiển thị đầy đủ email, mật khẩu, nút đăng nhập và không có link đăng ký công khai", async ({
     page,
   }) => {
