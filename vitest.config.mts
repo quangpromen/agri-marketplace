@@ -26,6 +26,7 @@ export default defineConfig({
         "src/server/auth/**/*.ts",
         "src/server/security/**/*.ts",
         "src/lib/admin-contact-presentation.ts",
+        "src/app/(admin)/admin/(protected)/page.tsx",
         "src/app/(admin)/admin/(protected)/lien-he/**/*.tsx",
       ],
       exclude: ["**/*.d.ts"],

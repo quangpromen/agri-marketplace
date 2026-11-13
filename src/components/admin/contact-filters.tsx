@@ -7,16 +7,18 @@ import { RotateCcw, Search } from "lucide-react";
 import { Button, getButtonClassName } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  CONTACT_STATUS_OPTIONS,
+  CONTACT_PERIOD_FILTER_OPTIONS,
+  CONTACT_STATUS_FILTER_OPTIONS,
   EMAIL_STATUS_OPTIONS,
 } from "@/lib/admin-contact-presentation";
 import {
   ADMIN_CONTACTS_PATH,
   type AdminContactFilters,
-  type ContactSubmissionStatus,
-  type EmailDeliveryStatus,
   MAX_ADMIN_CONTACT_SEARCH_LENGTH,
+  adminContactPeriodFilterSchema,
+  adminContactStatusFilterSchema,
   buildAdminContactsHref,
+  emailDeliveryStatusSchema,
   hasActiveAdminContactFilters,
 } from "@/schemas/admin-contact";
 import type { ContactServiceOption } from "@/server/admin/contact-submissions";
@@ -34,13 +36,21 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
   const [status, setStatus] = useState<string>(filters.status ?? "");
   const [emailStatus, setEmailStatus] = useState<string>(filters.emailStatus ?? "");
   const [service, setService] = useState<string>(filters.service ?? "");
+  const [period, setPeriod] = useState<string>(filters.period ?? "");
 
   useEffect(() => {
     setQuery(filters.q ?? "");
     setStatus(filters.status ?? "");
     setEmailStatus(filters.emailStatus ?? "");
     setService(filters.service ?? "");
-  }, [filters.q, filters.status, filters.emailStatus, filters.service]);
+    setPeriod(filters.period ?? "");
+  }, [
+    filters.q,
+    filters.status,
+    filters.emailStatus,
+    filters.service,
+    filters.period,
+  ]);
 
   const hasFilters = hasActiveAdminContactFilters(filters);
 
@@ -49,15 +59,29 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
     status?: string;
     emailStatus?: string;
     service?: string;
+    period?: string;
   }) => {
     const trimmedQuery = next.q?.trim();
+    const parsedStatus = next.status
+      ? adminContactStatusFilterSchema.safeParse(next.status)
+      : null;
+    const parsedEmailStatus = next.emailStatus
+      ? emailDeliveryStatusSchema.safeParse(next.emailStatus)
+      : null;
+    const parsedPeriod = next.period
+      ? adminContactPeriodFilterSchema.safeParse(next.period)
+      : null;
+
     const href = buildAdminContactsHref({
-      ...(trimmedQuery ? { q: trimmedQuery.slice(0, MAX_ADMIN_CONTACT_SEARCH_LENGTH) } : {}),
-      ...(next.status ? { status: next.status as ContactSubmissionStatus } : {}),
-      ...(next.emailStatus
-        ? { emailStatus: next.emailStatus as EmailDeliveryStatus }
+      ...(trimmedQuery
+        ? { q: trimmedQuery.slice(0, MAX_ADMIN_CONTACT_SEARCH_LENGTH) }
+        : {}),
+      ...(parsedStatus?.success ? { status: parsedStatus.data } : {}),
+      ...(parsedEmailStatus?.success
+        ? { emailStatus: parsedEmailStatus.data }
         : {}),
       ...(next.service ? { service: next.service } : {}),
+      ...(parsedPeriod?.success ? { period: parsedPeriod.data } : {}),
       page: 1,
     });
 
@@ -73,6 +97,7 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
       status,
       emailStatus,
       service,
+      period,
     });
   };
 
@@ -88,7 +113,7 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
           className="space-y-4"
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
-            <div className="space-y-1.5 xl:col-span-4">
+            <div className="space-y-1.5 md:col-span-2 xl:col-span-4">
               <label
                 htmlFor="contact-filter-q"
                 className="block text-xs font-semibold text-foreground"
@@ -132,12 +157,13 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
                     status: nextStatus,
                     emailStatus,
                     service,
+                    period,
                   });
                 }}
                 className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground"
               >
                 <option value="">Tất cả</option>
-                {CONTACT_STATUS_OPTIONS.map((option) => (
+                {CONTACT_STATUS_FILTER_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -145,7 +171,7 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
               </select>
             </div>
 
-            <div className="space-y-1.5 xl:col-span-3">
+            <div className="space-y-1.5 xl:col-span-2">
               <label
                 htmlFor="contact-filter-email-status"
                 className="block text-xs font-semibold text-foreground"
@@ -164,6 +190,7 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
                     status,
                     emailStatus: nextEmailStatus,
                     service,
+                    period,
                   });
                 }}
                 className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground"
@@ -177,7 +204,7 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
               </select>
             </div>
 
-            <div className="space-y-1.5 xl:col-span-3">
+            <div className="space-y-1.5 xl:col-span-2">
               <label
                 htmlFor="contact-filter-service"
                 className="block text-xs font-semibold text-foreground"
@@ -196,12 +223,46 @@ export function ContactFilters({ filters, serviceOptions }: ContactFiltersProps)
                     status,
                     emailStatus,
                     service: nextService,
+                    period,
                   });
                 }}
                 className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground"
               >
                 <option value="">Tất cả</option>
                 {serviceOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 xl:col-span-2">
+              <label
+                htmlFor="contact-filter-period"
+                className="block text-xs font-semibold text-foreground"
+              >
+                Khoảng thời gian
+              </label>
+              <select
+                id="contact-filter-period"
+                name="period"
+                value={period}
+                onChange={(event) => {
+                  const nextPeriod = event.target.value;
+                  setPeriod(nextPeriod);
+                  navigateWithFilters({
+                    q: query,
+                    status,
+                    emailStatus,
+                    service,
+                    period: nextPeriod,
+                  });
+                }}
+                className="focus-ring h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+              >
+                <option value="">Tất cả thời gian</option>
+                {CONTACT_PERIOD_FILTER_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

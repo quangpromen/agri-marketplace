@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireAdmin: vi.fn(),
+  getAdminDashboardData: vi.fn(),
   listContactSubmissions: vi.fn(),
   listDistinctContactServices: vi.fn(),
   getContactSubmissionById: vi.fn(),
@@ -23,6 +24,10 @@ vi.mock("@/db/client", () => ({
 
 vi.mock("@/server/auth/require-admin", () => ({
   requireAdmin: mocks.requireAdmin,
+}));
+
+vi.mock("@/server/admin/dashboard", () => ({
+  getAdminDashboardData: mocks.getAdminDashboardData,
 }));
 
 vi.mock("@/server/admin/contact-submissions", () => ({
@@ -62,6 +67,9 @@ vi.mock("react-dom", async () => {
 });
 
 import ProtectedAdminLayout from "@/app/(admin)/admin/(protected)/layout";
+import AdminDashboardPage, {
+  metadata as dashboardMetadata,
+} from "@/app/(admin)/admin/(protected)/page";
 import AdminContactListPage from "@/app/(admin)/admin/(protected)/lien-he/page";
 import AdminContactDetailNotFound from "@/app/(admin)/admin/(protected)/lien-he/[id]/not-found";
 import AdminContactDetailPage, {
@@ -91,6 +99,7 @@ describe("Admin contact pages & protection", () => {
         updatedAt: new Date(),
       },
     });
+    mocks.getAdminDashboardData.mockReset();
     mocks.listContactSubmissions.mockReset();
     mocks.listDistinctContactServices.mockReset().mockResolvedValue([
       { value: "hop-rau-tuan", label: "Mua nông sản / Hộp rau gia đình" },
@@ -318,5 +327,256 @@ describe("Admin contact pages & protection", () => {
     expect(html).toContain("Không tìm thấy yêu cầu tư vấn");
     expect(html).toContain('href="/admin/lien-he"');
     expect(html).toContain("Quay lại danh sách yêu cầu");
+  });
+
+  it("trang danh sách hỗ trợ lọc status=open (Chưa xử lý) và period=7d (7 ngày gần nhất), giữ qua phân trang và quay lại từ chi tiết", async () => {
+    mocks.listContactSubmissions.mockResolvedValueOnce({
+      items: [
+        {
+          id: VALID_UUID,
+          name: "Phạm Thị Hoa",
+          phone: "0901234567",
+          email: "hoa@example.com",
+          service: "hop-rau-tuan",
+          status: "new",
+          emailStatus: "sent",
+          createdAt: new Date("2026-11-12T08:30:00Z"),
+        },
+      ],
+      totalCount: 42,
+      page: 2,
+      pageSize: 20,
+      totalPages: 3,
+      isOutOfRange: false,
+    });
+
+    const listHtml = renderToStaticMarkup(
+      await AdminContactListPage({
+        searchParams: { status: "open", period: "7d", page: "2" },
+      })
+    );
+
+    expect(mocks.listContactSubmissions).toHaveBeenCalledWith({
+      status: "open",
+      period: "7d",
+      page: 2,
+    });
+    expect(listHtml).toContain('value="open"');
+    expect(listHtml).toContain("Chưa xử lý");
+    expect(listHtml).toContain('value="7d"');
+    expect(listHtml).toContain("7 ngày gần nhất");
+    expect(listHtml).toContain("Xoá bộ lọc");
+    expect(listHtml).toContain('href="/admin/lien-he?status=open&amp;period=7d"');
+    expect(listHtml).toContain(
+      'href="/admin/lien-he?status=open&amp;period=7d&amp;page=3"'
+    );
+    expect(listHtml).toContain(
+      `href="/admin/lien-he/${VALID_UUID}?status=open&amp;period=7d&amp;page=2"`
+    );
+
+    mocks.getContactSubmissionById.mockResolvedValueOnce({
+      id: VALID_UUID,
+      name: "Phạm Thị Hoa",
+      phone: "0901234567",
+      email: "hoa@example.com",
+      service: "hop-rau-tuan",
+      message: "Cần đặt rau hữu cơ.",
+      status: "new",
+      emailStatus: "sent",
+      createdAt: new Date("2026-11-12T08:30:00Z"),
+      updatedAt: new Date("2026-11-12T08:30:00Z"),
+    });
+
+    const detailHtml = renderToStaticMarkup(
+      await AdminContactDetailPage({
+        params: { id: VALID_UUID },
+        searchParams: { status: "open", period: "7d", page: "2" },
+      })
+    );
+
+    expect(detailHtml).toContain(
+      'href="/admin/lien-he?status=open&amp;period=7d&amp;page=2"'
+    );
+    expect(detailHtml).not.toContain('<option value="open"');
+  });
+
+  it("người chưa đăng nhập không truy cập được dashboard /admin và không truy vấn dữ liệu dashboard", async () => {
+    mocks.requireAdmin.mockRejectedValueOnce(
+      new Error("NEXT_REDIRECT:/admin/login")
+    );
+
+    await expect(AdminDashboardPage()).rejects.toThrow(
+      "NEXT_REDIRECT:/admin/login"
+    );
+    expect(mocks.getAdminDashboardData).not.toHaveBeenCalled();
+  });
+
+  it("dashboard /admin gọi requireAdmin trước khi truy vấn, hiển thị 5 chỉ số, liên kết lọc, 5 yêu cầu mới nhất và không lộ token hay PII khách hàng", async () => {
+    const callOrder: string[] = [];
+
+    mocks.requireAdmin.mockImplementationOnce(async () => {
+      callOrder.push("requireAdmin");
+      return {
+        user: {
+          id: "admin-1",
+          name: "Quản trị viên",
+          email: "admin@mocfarm.vn",
+          emailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        session: {
+          id: "sess-1",
+          userId: "admin-1",
+          token: SECRET_SESSION_TOKEN,
+          expiresAt: new Date(Date.now() + 60_000),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      };
+    });
+
+    const recentIds = [
+      "550e8400-e29b-41d4-a716-446655440011",
+      "550e8400-e29b-41d4-a716-446655440012",
+      "550e8400-e29b-41d4-a716-446655440013",
+      "550e8400-e29b-41d4-a716-446655440014",
+      "550e8400-e29b-41d4-a716-446655440015",
+    ];
+
+    mocks.getAdminDashboardData.mockImplementationOnce(async () => {
+      callOrder.push("getAdminDashboardData");
+      return {
+        totalCount: 1250,
+        newCount: 42,
+        openCount: 120,
+        failedEmailCount: 3,
+        lastSevenDaysCount: 18,
+        recentSubmissions: [
+          {
+            id: recentIds[0],
+            name: "Khách Hàng Một",
+            service: "hop-rau-tuan",
+            status: "new",
+            emailStatus: "failed",
+            createdAt: new Date("2026-11-13T09:00:00Z"),
+            // Giả lập phòng ngừa nếu object có field thừa ở runtime cũng không được render ra HTML
+            email: "secret-customer-1@example.com",
+            phone: "0988111222",
+            message: "TIN_NHAN_KHONG_DUOC_HIEN_THI",
+          },
+          {
+            id: recentIds[1],
+            name: "Khách Hàng Hai",
+            service: "cung-ung-bep-an",
+            status: "contacted",
+            emailStatus: "sent",
+            createdAt: new Date("2026-11-12T10:00:00Z"),
+          },
+          {
+            id: recentIds[2],
+            name: "Khách Hàng Ba",
+            service: "chuyen-giao-ky-thuat",
+            status: "resolved",
+            emailStatus: "sent",
+            createdAt: new Date("2026-11-11T10:00:00Z"),
+          },
+          {
+            id: recentIds[3],
+            name: "Khách Hàng Bốn",
+            service: "tham-quan-nong-trai",
+            status: "spam",
+            emailStatus: "pending",
+            createdAt: new Date("2026-11-10T10:00:00Z"),
+          },
+          {
+            id: recentIds[4],
+            name: "Khách Hàng Năm",
+            service: "khac",
+            status: "new",
+            emailStatus: "sent",
+            createdAt: new Date("2026-11-09T10:00:00Z"),
+          },
+        ],
+      };
+    });
+
+    const html = renderToStaticMarkup(await AdminDashboardPage());
+
+    expect(callOrder).toEqual(["requireAdmin", "getAdminDashboardData"]);
+
+    // Tiêu đề và lời chào
+    expect(html).toContain("Trang quản trị Mộc Farm");
+    expect(html).toContain("Quản trị viên");
+
+    // 5 thẻ chỉ số và số đã format
+    expect(html).toContain("Tổng yêu cầu");
+    expect(html).toContain("1.250");
+    expect(html).toContain("Yêu cầu mới");
+    expect(html).toContain("42");
+    expect(html).toContain("Chưa xử lý");
+    expect(html).toContain("120");
+    expect(html).toContain("Email gửi thất bại");
+    expect(html).toContain("Cần kiểm tra");
+    expect(html).toContain("7 ngày gần nhất");
+    expect(html).toContain("18");
+
+    // 5 liên kết đúng tới /admin/lien-he với bộ lọc tương ứng
+    expect(html).toContain('href="/admin/lien-he"');
+    expect(html).toContain('href="/admin/lien-he?status=new"');
+    expect(html).toContain('href="/admin/lien-he?status=open"');
+    expect(html).toContain('href="/admin/lien-he?emailStatus=failed"');
+    expect(html).toContain('href="/admin/lien-he?period=7d"');
+
+    // Khối 5 yêu cầu mới nhất
+    expect(html).toContain("Yêu cầu mới nhất");
+    expect(html).toContain("Xem tất cả yêu cầu");
+    expect(html).toContain("Khách Hàng Một");
+    expect(html).toContain("Khách Hàng Năm");
+    expect(html).toContain("Mua nông sản / Hộp rau gia đình");
+    expect(html).toContain("Cung ứng cho nhà hàng / Siêu thị");
+    expect(html).toContain("Mới");
+    expect(html).toContain("Đã liên hệ");
+    expect(html).toContain("Đã xử lý");
+    expect(html).toContain("Spam");
+    expect(html).toContain("Gửi thất bại");
+    expect(html).toContain("Đã gửi");
+    expect(html).toContain("Đang chờ");
+    expect(html).toContain("Xem chi tiết");
+
+    for (const id of recentIds) {
+      expect(html).toContain(`href="/admin/lien-he/${id}"`);
+    }
+
+    // Không rò rỉ session token hoặc PII khách hàng
+    expect(html).not.toContain(SECRET_SESSION_TOKEN);
+    expect(html).not.toContain("secret-customer-1@example.com");
+    expect(html).not.toContain("0988111222");
+    expect(html).not.toContain("TIN_NHAN_KHONG_DUOC_HIEN_THI");
+
+    // Metadata noIndex và không chứa PII
+    expect(dashboardMetadata.robots).toEqual({ index: false, follow: false });
+    expect(JSON.stringify(dashboardMetadata)).not.toContain("admin@mocfarm.vn");
+  });
+
+  it("dashboard /admin hiển thị empty state rõ ràng và các chỉ số bằng 0 khi chưa có yêu cầu nào", async () => {
+    mocks.getAdminDashboardData.mockResolvedValueOnce({
+      totalCount: 0,
+      newCount: 0,
+      openCount: 0,
+      failedEmailCount: 0,
+      lastSevenDaysCount: 0,
+      recentSubmissions: [],
+    });
+
+    const html = renderToStaticMarkup(await AdminDashboardPage());
+
+    expect(html).toContain("Chưa có yêu cầu tư vấn nào");
+    expect(html).toContain("Yêu cầu mới nhất");
+    expect(html).toContain("Xem tất cả yêu cầu");
+    expect(html).toContain('href="/admin/lien-he"');
+    expect(html.match(/>0<\/p>/g)).toHaveLength(5);
+    expect(html).not.toContain("Cần kiểm tra");
+    expect(html).not.toContain("<table");
   });
 });

@@ -1,14 +1,16 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contactSubmissions } from "@/db/schema";
 import {
   ADMIN_CONTACT_PAGE_SIZE,
+  OPEN_CONTACT_SUBMISSION_STATUSES,
   type AdminContactFilters,
   type ContactSubmissionStatus,
   type EmailDeliveryStatus,
   contactSubmissionIdSchema,
+  getSevenDaysAgo,
   updateContactStatusSchema,
 } from "@/schemas/admin-contact";
 import { contactServiceValues, getContactServiceLabel } from "@/schemas/contact";
@@ -62,11 +64,16 @@ export function escapeLikePattern(value: string): string {
 }
 
 export function buildContactSubmissionWhereClause(
-  filters: Omit<AdminContactFilters, "page">
+  filters: Omit<AdminContactFilters, "page">,
+  now: Date = new Date()
 ): SQL | undefined {
   const conditions: SQL[] = [];
 
-  if (filters.status) {
+  if (filters.status === "open") {
+    conditions.push(
+      inArray(contactSubmissions.status, [...OPEN_CONTACT_SUBMISSION_STATUSES])
+    );
+  } else if (filters.status) {
     conditions.push(eq(contactSubmissions.status, filters.status));
   }
 
@@ -76,6 +83,11 @@ export function buildContactSubmissionWhereClause(
 
   if (filters.service) {
     conditions.push(eq(contactSubmissions.service, filters.service));
+  }
+
+  if (filters.period === "7d") {
+    const sevenDaysAgo = getSevenDaysAgo(now);
+    conditions.push(gte(contactSubmissions.createdAt, sevenDaysAgo));
   }
 
   if (filters.q) {
@@ -136,11 +148,12 @@ async function fetchContactSubmissionPage(
 }
 
 export async function listContactSubmissions(
-  filters: AdminContactFilters
+  filters: AdminContactFilters,
+  now: Date = new Date()
 ): Promise<ContactSubmissionListResult> {
   const pageSize = ADMIN_CONTACT_PAGE_SIZE;
   const requestedPage = Math.max(1, filters.page);
-  const whereClause = buildContactSubmissionWhereClause(filters);
+  const whereClause = buildContactSubmissionWhereClause(filters, now);
 
   const countRows = await db
     .select({ total: count() })

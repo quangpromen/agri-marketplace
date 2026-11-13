@@ -79,6 +79,12 @@ describe("updateContactSubmissionStatusAction Server Action", () => {
     );
     expect(invalidStatusResult.status).toBe("validation_error");
 
+    const openFilterStatusResult = await updateContactSubmissionStatusAction(
+      { status: "idle" },
+      makeFormData(VALID_UUID, "open")
+    );
+    expect(openFilterStatusResult.status).toBe("validation_error");
+
     const emptyFormDataResult = await updateContactSubmissionStatusAction(
       { status: "idle" },
       new FormData()

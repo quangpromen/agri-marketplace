@@ -69,6 +69,51 @@ describe("admin contact-submissions database queries", () => {
     ]);
   });
 
+  it("buildContactSubmissionWhereClause xử lý status=open (new, contacted), period=7d và kết hợp đầy đủ bộ lọc", () => {
+    const fixedNow = new Date("2026-11-13T10:30:00.000Z");
+    const expectedSevenDaysAgo = new Date("2026-11-06T10:30:00.000Z");
+
+    const openWhere = buildContactSubmissionWhereClause({ status: "open" });
+    const openCompiled = pgDialect.sqlToQuery(openWhere!);
+    expect(openCompiled.sql).toContain('"contact_submissions"."status" in ($1, $2)');
+    expect(openCompiled.params).toEqual(["new", "contacted"]);
+
+    const periodWhere = buildContactSubmissionWhereClause(
+      { period: "7d" },
+      fixedNow
+    );
+    const periodCompiled = pgDialect.sqlToQuery(periodWhere!);
+    expect(periodCompiled.sql).toContain('"contact_submissions"."created_at" >= $1');
+    expect(periodCompiled.params).toEqual([expectedSevenDaysAgo.toISOString()]);
+
+    const combinedWhere = buildContactSubmissionWhereClause(
+      {
+        q: "lan",
+        status: "open",
+        emailStatus: "failed",
+        service: "hop-rau-tuan",
+        period: "7d",
+      },
+      fixedNow
+    );
+    const combinedCompiled = pgDialect.sqlToQuery(combinedWhere!);
+    expect(combinedCompiled.sql).toContain('"contact_submissions"."status" in ($1, $2)');
+    expect(combinedCompiled.sql).toContain('"contact_submissions"."email_status" = $3');
+    expect(combinedCompiled.sql).toContain('"contact_submissions"."service" = $4');
+    expect(combinedCompiled.sql).toContain('"contact_submissions"."created_at" >= $5');
+    expect(combinedCompiled.sql).toContain('"contact_submissions"."name" ilike $6');
+    expect(combinedCompiled.params).toEqual([
+      "new",
+      "contacted",
+      "failed",
+      "hop-rau-tuan",
+      expectedSevenDaysAgo.toISOString(),
+      "%lan%",
+      "%lan%",
+      "%lan%",
+    ]);
+  });
+
   it("buildContactSubmissionWhereClause bổ sung biến thể SĐT bỏ khoảng trắng khi tìm kiếm số điện thoại", () => {
     const whereClause = buildContactSubmissionWhereClause({
       q: "0912 345 678",
@@ -191,9 +236,10 @@ describe("admin contact-submissions database queries", () => {
 
     const result = await listContactSubmissions({
       q: "binh",
-      status: "contacted",
+      status: "open",
+      period: "7d",
       page: 100_000,
-    });
+    }, new Date("2026-11-13T10:30:00.000Z"));
 
     expect(callOrder).toEqual(["count", "list"]);
     expect(mocks.select).toHaveBeenCalledTimes(2);
@@ -207,6 +253,10 @@ describe("admin contact-submissions database queries", () => {
     const listWhereArg = listWhere.mock.calls[0]?.[0];
     expect(countWhereArg).toBeDefined();
     expect(listWhereArg).toBe(countWhereArg);
+
+    const compiled = pgDialect.sqlToQuery(countWhereArg);
+    expect(compiled.sql).toContain('"contact_submissions"."status" in ($1, $2)');
+    expect(compiled.sql).toContain('"contact_submissions"."created_at" >= $3');
 
     expect(result).toEqual({
       items: [lastPageItem],

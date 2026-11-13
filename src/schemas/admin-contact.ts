@@ -13,10 +13,27 @@ export const CONTACT_SUBMISSION_STATUSES = [
   "spam",
 ] as const;
 
+export const OPEN_CONTACT_SUBMISSION_STATUSES = ["new", "contacted"] as const;
+
+export const ADMIN_CONTACT_STATUS_FILTER_VALUES = [
+  ...CONTACT_SUBMISSION_STATUSES,
+  "open",
+] as const;
+
+export const ADMIN_CONTACT_PERIOD_FILTERS = ["7d"] as const;
+
 export const EMAIL_DELIVERY_STATUSES = ["pending", "sent", "failed"] as const;
 
+export const SEVEN_DAYS_IN_MS = 7 * 24 * 60 * 60 * 1000;
+
 export type ContactSubmissionStatus = (typeof CONTACT_SUBMISSION_STATUSES)[number];
+export type AdminContactStatusFilter = ContactSubmissionStatus | "open";
+export type AdminContactPeriodFilter = (typeof ADMIN_CONTACT_PERIOD_FILTERS)[number];
 export type EmailDeliveryStatus = (typeof EMAIL_DELIVERY_STATUSES)[number];
+
+export function getSevenDaysAgo(now: Date = new Date()): Date {
+  return new Date(now.getTime() - SEVEN_DAYS_IN_MS);
+}
 
 const CONTROL_CHAR_PATTERN = /[\u0000-\u001F\u007F]/;
 const CONTROL_CHAR_GLOBAL_PATTERN = /[\u0000-\u001F\u007F]/g;
@@ -30,6 +47,16 @@ export const contactSubmissionIdSchema = z
 export const contactSubmissionStatusSchema = z.enum(
   CONTACT_SUBMISSION_STATUSES,
   "Trạng thái xử lý không hợp lệ."
+);
+
+export const adminContactStatusFilterSchema = z.enum(
+  ADMIN_CONTACT_STATUS_FILTER_VALUES,
+  "Bộ lọc trạng thái xử lý không hợp lệ."
+);
+
+export const adminContactPeriodFilterSchema = z.enum(
+  ADMIN_CONTACT_PERIOD_FILTERS,
+  "Bộ lọc khoảng thời gian không hợp lệ."
 );
 
 export const emailDeliveryStatusSchema = z.enum(
@@ -83,9 +110,10 @@ export type RawSearchParams = Record<string, string | string[] | undefined>;
 
 export type AdminContactFilters = {
   q?: string;
-  status?: ContactSubmissionStatus;
+  status?: AdminContactStatusFilter;
   emailStatus?: EmailDeliveryStatus;
   service?: string;
+  period?: AdminContactPeriodFilter;
   page: number;
 };
 
@@ -123,7 +151,7 @@ export function parseAdminContactSearchParams(
   const rawStatus = getParam("status")?.trim();
   const parsedStatus =
     rawStatus && rawStatus !== "all"
-      ? contactSubmissionStatusSchema.safeParse(rawStatus)
+      ? adminContactStatusFilterSchema.safeParse(rawStatus)
       : null;
 
   const rawEmailStatus = getParam("emailStatus")?.trim();
@@ -138,6 +166,12 @@ export function parseAdminContactSearchParams(
       ? adminContactServiceFilterSchema.safeParse(rawService)
       : null;
 
+  const rawPeriod = getParam("period")?.trim();
+  const parsedPeriod =
+    rawPeriod && rawPeriod !== "all"
+      ? adminContactPeriodFilterSchema.safeParse(rawPeriod)
+      : null;
+
   const rawPage = getParam("page");
   const parsedPage =
     typeof rawPage === "string" ? adminContactPageSchema.safeParse(rawPage) : null;
@@ -147,6 +181,7 @@ export function parseAdminContactSearchParams(
     ...(parsedStatus?.success ? { status: parsedStatus.data } : {}),
     ...(parsedEmailStatus?.success ? { emailStatus: parsedEmailStatus.data } : {}),
     ...(parsedService?.success ? { service: parsedService.data } : {}),
+    ...(parsedPeriod?.success ? { period: parsedPeriod.data } : {}),
     page: parsedPage?.success ? parsedPage.data : 1,
   };
 }
@@ -154,7 +189,9 @@ export function parseAdminContactSearchParams(
 export function hasActiveAdminContactFilters(
   filters: Omit<AdminContactFilters, "page">
 ): boolean {
-  return Boolean(filters.q || filters.status || filters.emailStatus || filters.service);
+  return Boolean(
+    filters.q || filters.status || filters.emailStatus || filters.service || filters.period
+  );
 }
 
 function buildAdminContactQueryString(
@@ -173,6 +210,9 @@ function buildAdminContactQueryString(
   }
   if (filters.service) {
     params.set("service", filters.service);
+  }
+  if (filters.period) {
+    params.set("period", filters.period);
   }
   if (filters.page && filters.page > 1) {
     params.set("page", String(filters.page));

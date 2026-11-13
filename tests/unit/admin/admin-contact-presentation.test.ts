@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONTACT_PERIOD_FILTER_OPTIONS,
+  CONTACT_STATUS_FILTER_OPTIONS,
   CONTACT_STATUS_META,
   CONTACT_STATUS_OPTIONS,
   EMAIL_STATUS_META,
@@ -15,6 +17,14 @@ describe("admin-contact presentation helpers", () => {
   it("ánh xạ đầy đủ metadata và options cho tất cả trạng thái xử lý và gửi email", () => {
     expect(CONTACT_STATUS_OPTIONS.map((item) => item.value)).toEqual([
       ...CONTACT_SUBMISSION_STATUSES,
+    ]);
+    expect("open" in CONTACT_STATUS_META).toBe(false);
+    expect(CONTACT_STATUS_FILTER_OPTIONS).toEqual([
+      { value: "open", label: "Chưa xử lý" },
+      ...CONTACT_STATUS_OPTIONS,
+    ]);
+    expect(CONTACT_PERIOD_FILTER_OPTIONS).toEqual([
+      { value: "7d", label: "7 ngày gần nhất" },
     ]);
     expect(EMAIL_STATUS_OPTIONS.map((item) => item.value)).toEqual([
       ...EMAIL_DELIVERY_STATUSES,

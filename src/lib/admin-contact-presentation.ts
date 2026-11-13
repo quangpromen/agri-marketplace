@@ -1,4 +1,6 @@
 import type {
+  AdminContactPeriodFilter,
+  AdminContactStatusFilter,
   ContactSubmissionStatus,
   EmailDeliveryStatus,
 } from "@/schemas/admin-contact";
@@ -81,6 +83,19 @@ export const CONTACT_STATUS_OPTIONS = CONTACT_SUBMISSION_STATUSES.map((value) =>
   value,
   label: CONTACT_STATUS_META[value].label,
 }));
+
+export const CONTACT_STATUS_FILTER_OPTIONS: ReadonlyArray<{
+  value: AdminContactStatusFilter;
+  label: string;
+}> = [
+  { value: "open", label: "Chưa xử lý" },
+  ...CONTACT_STATUS_OPTIONS,
+];
+
+export const CONTACT_PERIOD_FILTER_OPTIONS: ReadonlyArray<{
+  value: AdminContactPeriodFilter;
+  label: string;
+}> = [{ value: "7d", label: "7 ngày gần nhất" }];
 
 export const EMAIL_STATUS_OPTIONS = EMAIL_DELIVERY_STATUSES.map((value) => ({
   value,
