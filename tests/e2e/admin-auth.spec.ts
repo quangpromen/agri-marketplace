@@ -118,7 +118,7 @@ test.describe("xác thực trang quản trị", () => {
 
     await expect(page).toHaveURL(/\/admin$/);
     await expect(
-      page.getByRole("heading", { name: "Trang quản trị Mộc Farm" })
+      page.getByRole("heading", { name: "Tổng quan vận hành" })
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Đăng xuất" }).click();

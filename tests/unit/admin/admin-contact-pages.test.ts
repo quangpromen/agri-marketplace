@@ -67,6 +67,7 @@ vi.mock("react-dom", async () => {
 });
 
 import ProtectedAdminLayout from "@/app/(admin)/admin/(protected)/layout";
+import AdminDashboardLoading from "@/app/(admin)/admin/(protected)/loading";
 import AdminDashboardPage, {
   metadata as dashboardMetadata,
 } from "@/app/(admin)/admin/(protected)/page";
@@ -452,6 +453,31 @@ describe("Admin contact pages & protection", () => {
         openCount: 120,
         failedEmailCount: 3,
         lastSevenDaysCount: 18,
+        trend: [
+          { date: "2026-10-31", label: "31/10", count: 1 },
+          { date: "2026-11-01", label: "01/11", count: 2 },
+          { date: "2026-11-02", label: "02/11", count: 0 },
+          { date: "2026-11-03", label: "03/11", count: 3 },
+          { date: "2026-11-04", label: "04/11", count: 1 },
+          { date: "2026-11-05", label: "05/11", count: 2 },
+          { date: "2026-11-06", label: "06/11", count: 1 },
+          { date: "2026-11-07", label: "07/11", count: 4 },
+          { date: "2026-11-08", label: "08/11", count: 2 },
+          { date: "2026-11-09", label: "09/11", count: 3 },
+          { date: "2026-11-10", label: "10/11", count: 1 },
+          { date: "2026-11-11", label: "11/11", count: 2 },
+          { date: "2026-11-12", label: "12/11", count: 4 },
+          { date: "2026-11-13", label: "13/11", count: 2 },
+        ],
+        statusDistribution: {
+          total: 1250,
+          items: [
+            { status: "new", count: 42, percentage: 3.4 },
+            { status: "contacted", count: 78, percentage: 6.2 },
+            { status: "resolved", count: 1100, percentage: 88 },
+            { status: "spam", count: 30, percentage: 2.4 },
+          ],
+        },
         recentSubmissions: [
           {
             id: recentIds[0],
@@ -505,9 +531,11 @@ describe("Admin contact pages & protection", () => {
 
     expect(callOrder).toEqual(["requireAdmin", "getAdminDashboardData"]);
 
-    // Tiêu đề và lời chào
-    expect(html).toContain("Trang quản trị Mộc Farm");
+    // Header vận hành tinh gọn và thông tin phiên quản trị
+    expect(html).toContain("Tổng quan vận hành");
     expect(html).toContain("Quản trị viên");
+    expect(html).toContain("Cập nhật theo dữ liệu hiện tại");
+    expect(html).toContain("Quản lý yêu cầu tư vấn");
 
     // 5 thẻ chỉ số và số đã format
     expect(html).toContain("Tổng yêu cầu");
@@ -527,6 +555,32 @@ describe("Admin contact pages & protection", () => {
     expect(html).toContain('href="/admin/lien-he?status=open"');
     expect(html).toContain('href="/admin/lien-he?emailStatus=failed"');
     expect(html).toContain('href="/admin/lien-he?period=7d"');
+
+    // Khối biểu đồ cột xu hướng 14 ngày
+    expect(html).toContain("XU HƯỚNG TIẾP NHẬN");
+    expect(html).toContain("Yêu cầu theo ngày");
+    expect(html).toContain("14 ngày gần nhất · theo múi giờ Việt Nam");
+    expect(html).toContain("yêu cầu trong kỳ");
+    expect(html).toContain("31/10 – 13/11");
+    expect(html).toContain(
+      "Biểu đồ cột yêu cầu tư vấn theo ngày trong 14 ngày gần nhất"
+    );
+    expect(html).toContain("Ngày có dữ liệu");
+    expect(html).toContain("Trung bình/ngày");
+    expect(html).toContain("Cao nhất");
+    expect(html).toContain("4 yêu cầu (12/11 · 2 ngày)");
+    expect(html).not.toContain("Đỉnh 4/ngày");
+    expect(html).not.toContain("Di chuột hoặc nhấn Tab");
+
+    // Khối phân bổ trạng thái và các liên kết lọc trạng thái
+    expect(html).toContain("Phân bổ trạng thái");
+    expect(html).toContain("3,4%");
+    expect(html).toContain("6,2%");
+    expect(html).toContain("88%");
+    expect(html).toContain("2,4%");
+    expect(html).toContain('href="/admin/lien-he?status=contacted"');
+    expect(html).toContain('href="/admin/lien-he?status=resolved"');
+    expect(html).toContain('href="/admin/lien-he?status=spam"');
 
     // Khối 5 yêu cầu mới nhất
     expect(html).toContain("Yêu cầu mới nhất");
@@ -559,24 +613,50 @@ describe("Admin contact pages & protection", () => {
     expect(JSON.stringify(dashboardMetadata)).not.toContain("admin@mocfarm.vn");
   });
 
-  it("dashboard /admin hiển thị empty state rõ ràng và các chỉ số bằng 0 khi chưa có yêu cầu nào", async () => {
+  it("dashboard /admin hiển thị empty state rõ ràng cho biểu đồ, phân bổ trạng thái và danh sách khi chưa có yêu cầu nào", async () => {
     mocks.getAdminDashboardData.mockResolvedValueOnce({
       totalCount: 0,
       newCount: 0,
       openCount: 0,
       failedEmailCount: 0,
       lastSevenDaysCount: 0,
+      trend: Array.from({ length: 14 }, (_, index) => {
+        const day = String(index + 1).padStart(2, "0");
+        return { date: `2026-11-${day}`, label: `${day}/11`, count: 0 };
+      }),
+      statusDistribution: {
+        total: 0,
+        items: [
+          { status: "new", count: 0, percentage: 0 },
+          { status: "contacted", count: 0, percentage: 0 },
+          { status: "resolved", count: 0, percentage: 0 },
+          { status: "spam", count: 0, percentage: 0 },
+        ],
+      },
       recentSubmissions: [],
     });
 
     const html = renderToStaticMarkup(await AdminDashboardPage());
 
+    expect(html).toContain("Chưa ghi nhận yêu cầu mới trong 14 ngày gần đây.");
+    expect(html).toContain("Chưa có yêu cầu tư vấn để tính tỷ trọng phân bổ.");
     expect(html).toContain("Chưa có yêu cầu tư vấn nào");
     expect(html).toContain("Yêu cầu mới nhất");
     expect(html).toContain("Xem tất cả yêu cầu");
     expect(html).toContain('href="/admin/lien-he"');
-    expect(html.match(/>0<\/p>/g)).toHaveLength(5);
+    expect(html.match(/>0<\/p>/g)).toHaveLength(6); // 5 thẻ chỉ số + tổng phân bổ trạng thái
     expect(html).not.toContain("Cần kiểm tra");
-    expect(html).not.toContain("<table");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("Xem chi tiết");
+  });
+
+  it("route loading skeleton của dashboard khớp cấu trúc, tôn trọng reduced-motion và không dùng spinner hay số liệu giả", () => {
+    const html = renderToStaticMarkup(React.createElement(AdminDashboardLoading));
+
+    expect(html).toContain('role="status"');
+    expect(html).toContain("Đang tải dữ liệu tổng quan vận hành...");
+    expect(html).toContain("motion-safe:animate-pulse");
+    expect(html).not.toContain("animate-spin");
+    expect(html.match(/max-w-\[22px\]/g)).toHaveLength(14);
   });
 });

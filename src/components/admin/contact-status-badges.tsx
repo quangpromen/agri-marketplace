@@ -21,7 +21,7 @@ import type {
   EmailDeliveryStatus,
 } from "@/schemas/admin-contact";
 
-const badgeIcons: Record<BadgeIconKey, LucideIcon> = {
+export const badgeIcons: Record<BadgeIconKey, LucideIcon> = {
   sparkles: Sparkles,
   "phone-call": PhoneCall,
   "check-circle": CheckCircle2,
@@ -30,6 +30,17 @@ const badgeIcons: Record<BadgeIconKey, LucideIcon> = {
   "mail-check": MailCheck,
   "alert-triangle": AlertTriangle,
 };
+
+export function StatusMetaIcon({
+  iconKey,
+  className,
+}: {
+  iconKey: BadgeIconKey;
+  className?: string;
+}) {
+  const Icon = badgeIcons[iconKey];
+  return <Icon className={cn("h-3.5 w-3.5 shrink-0", className)} aria-hidden="true" />;
+}
 
 export function ContactStatusBadge({
   status,
