@@ -21,9 +21,12 @@ export default defineConfig({
       reportsDirectory: "coverage",
       include: [
         "src/schemas/**/*.ts",
-        "src/actions/{submit-contact,subscribe-newsletter,admin-auth}.ts",
+        "src/actions/{submit-contact,subscribe-newsletter,admin-auth,admin-contact}.ts",
+        "src/server/admin/**/*.ts",
         "src/server/auth/**/*.ts",
         "src/server/security/**/*.ts",
+        "src/lib/admin-contact-presentation.ts",
+        "src/app/(admin)/admin/(protected)/lien-he/**/*.tsx",
       ],
       exclude: ["**/*.d.ts"],
       thresholds: {

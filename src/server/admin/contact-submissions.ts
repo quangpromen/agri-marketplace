@@ -142,10 +142,10 @@ export async function listContactSubmissions(
   const requestedPage = Math.max(1, filters.page);
   const whereClause = buildContactSubmissionWhereClause(filters);
 
-  const [countRows, initialItems] = await Promise.all([
-    db.select({ total: count() }).from(contactSubmissions).where(whereClause),
-    fetchContactSubmissionPage(whereClause, requestedPage, pageSize),
-  ]);
+  const countRows = await db
+    .select({ total: count() })
+    .from(contactSubmissions)
+    .where(whereClause);
 
   const totalCount = Number(countRows[0]?.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -159,14 +159,15 @@ export async function listContactSubmissions(
       page: 1,
       pageSize,
       totalPages: 1,
-      isOutOfRange: requestedPage > 1,
+      isOutOfRange,
     };
   }
 
-  const items =
-    isOutOfRange && initialItems.length === 0
-      ? await fetchContactSubmissionPage(whereClause, effectivePage, pageSize)
-      : initialItems;
+  const items = await fetchContactSubmissionPage(
+    whereClause,
+    effectivePage,
+    pageSize
+  );
 
   return {
     items,

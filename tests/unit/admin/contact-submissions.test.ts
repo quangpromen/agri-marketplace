@@ -41,6 +41,7 @@ describe("admin contact-submissions database queries", () => {
 
   it("buildContactSubmissionWhereClause tạo điều kiện query parameterized cho tìm kiếm và lọc kết hợp", () => {
     expect(buildContactSubmissionWhereClause({})).toBeUndefined();
+    expect(buildContactSubmissionWhereClause({ q: "   " })).toBeUndefined();
 
     const whereClause = buildContactSubmissionWhereClause({
       q: "100% An",
@@ -78,7 +79,7 @@ describe("admin contact-submissions database queries", () => {
     expect(compiled.params).toContain("%0912345678%");
   });
 
-  it("listContactSubmissions chỉ select cột danh sách (không lấy message) và phân trang 20 bản ghi", async () => {
+  it("listContactSubmissions đếm trước rồi mới chạy đúng 1 query danh sách, áp dụng bộ lọc và không lấy message", async () => {
     const sampleItem = {
       id: VALID_UUID,
       name: "Nguyễn Văn An",
@@ -90,10 +91,19 @@ describe("admin contact-submissions database queries", () => {
       createdAt: new Date("2026-11-10T08:00:00Z"),
     };
 
-    const countWhere = vi.fn().mockResolvedValue([{ total: 25 }]);
+    const callOrder: string[] = [];
+
+    const countWhere = vi.fn().mockImplementation(async () => {
+      callOrder.push("count");
+      expect(mocks.select).toHaveBeenCalledTimes(1);
+      return [{ total: 25 }];
+    });
     const countFrom = vi.fn().mockReturnValue({ where: countWhere });
 
-    const listOffset = vi.fn().mockResolvedValue([sampleItem]);
+    const listOffset = vi.fn().mockImplementation(async () => {
+      callOrder.push("list");
+      return [sampleItem];
+    });
     const listLimit = vi.fn().mockReturnValue({ offset: listOffset });
     const listOrderBy = vi.fn().mockReturnValue({ limit: listLimit });
     const listWhere = vi.fn().mockReturnValue({ orderBy: listOrderBy });
@@ -106,8 +116,18 @@ describe("admin contact-submissions database queries", () => {
     const result = await listContactSubmissions({
       q: "an",
       status: "new",
+      emailStatus: "failed",
+      service: "hop-rau-tuan",
       page: 2,
     });
+
+    expect(callOrder).toEqual(["count", "list"]);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+
+    const countWhereArg = countWhere.mock.calls[0]?.[0];
+    const listWhereArg = listWhere.mock.calls[0]?.[0];
+    expect(countWhereArg).toBeDefined();
+    expect(listWhereArg).toBe(countWhereArg);
 
     const selectedCols = mocks.select.mock.calls[1][0] as Record<string, unknown>;
     expect(Object.keys(selectedCols).sort()).toEqual([
@@ -135,7 +155,7 @@ describe("admin contact-submissions database queries", () => {
     });
   });
 
-  it("listContactSubmissions xử lý an toàn khi page vượt quá tổng số trang", async () => {
+  it("listContactSubmissions khi page vượt phạm vi chỉ truy vấn 1 lần với offset trang cuối hợp lệ và giữ nguyên bộ lọc", async () => {
     const lastPageItem = {
       id: VALID_UUID,
       name: "Trần Thị Bình",
@@ -147,41 +167,102 @@ describe("admin contact-submissions database queries", () => {
       createdAt: new Date("2026-11-10T08:00:00Z"),
     };
 
-    const countWhere = vi.fn().mockResolvedValue([{ total: 25 }]);
+    const callOrder: string[] = [];
+
+    const countWhere = vi.fn().mockImplementation(async () => {
+      callOrder.push("count");
+      expect(mocks.select).toHaveBeenCalledTimes(1);
+      return [{ total: 25 }];
+    });
     const countFrom = vi.fn().mockReturnValue({ where: countWhere });
 
-    const emptyOffset = vi.fn().mockResolvedValue([]);
-    const fallbackOffset = vi.fn().mockResolvedValue([lastPageItem]);
-
-    const makeListChain = (offsetFn: ReturnType<typeof vi.fn>) => ({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({ offset: offsetFn }),
-          }),
-        }),
-      }),
+    const listOffset = vi.fn().mockImplementation(async () => {
+      callOrder.push("list");
+      return [lastPageItem];
     });
+    const listLimit = vi.fn().mockReturnValue({ offset: listOffset });
+    const listOrderBy = vi.fn().mockReturnValue({ limit: listLimit });
+    const listWhere = vi.fn().mockReturnValue({ orderBy: listOrderBy });
+    const listFrom = vi.fn().mockReturnValue({ where: listWhere });
 
     mocks.select
       .mockReturnValueOnce({ from: countFrom })
-      .mockReturnValueOnce(makeListChain(emptyOffset))
-      .mockReturnValueOnce(makeListChain(fallbackOffset));
+      .mockReturnValueOnce({ from: listFrom });
 
-    const result = await listContactSubmissions({ page: 99 });
+    const result = await listContactSubmissions({
+      q: "binh",
+      status: "contacted",
+      page: 100_000,
+    });
 
-    expect(emptyOffset).toHaveBeenCalledWith((99 - 1) * 20);
-    expect(fallbackOffset).toHaveBeenCalledWith(20);
-    expect(result.isOutOfRange).toBe(true);
-    expect(result.page).toBe(2);
-    expect(result.totalPages).toBe(2);
-    expect(result.items).toEqual([lastPageItem]);
+    expect(callOrder).toEqual(["count", "list"]);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+    expect(listLimit).toHaveBeenCalledTimes(1);
+    expect(listLimit).toHaveBeenCalledWith(20);
+    expect(listOffset).toHaveBeenCalledTimes(1);
+    expect(listOffset).toHaveBeenCalledWith(20);
+    expect(listOffset).not.toHaveBeenCalledWith((100_000 - 1) * 20);
+
+    const countWhereArg = countWhere.mock.calls[0]?.[0];
+    const listWhereArg = listWhere.mock.calls[0]?.[0];
+    expect(countWhereArg).toBeDefined();
+    expect(listWhereArg).toBe(countWhereArg);
+
+    expect(result).toEqual({
+      items: [lastPageItem],
+      totalCount: 25,
+      page: 2,
+      pageSize: 20,
+      totalPages: 2,
+      isOutOfRange: true,
+    });
+  });
+
+  it("listContactSubmissions không chạy query danh sách khi tổng số bản ghi bằng 0", async () => {
+    const countWherePage1 = vi.fn().mockResolvedValue([{ total: 0 }]);
+    mocks.select.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({ where: countWherePage1 }),
+    });
+
+    const emptyResultPage1 = await listContactSubmissions({ q: "khong-ton-tai", page: 1 });
+    expect(mocks.select).toHaveBeenCalledTimes(1);
+    expect(countWherePage1.mock.calls[0]?.[0]).toBeDefined();
+    expect(emptyResultPage1).toEqual({
+      items: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1,
+      isOutOfRange: false,
+    });
+
+    mocks.select.mockReset();
+
+    const countWhereOutOfRange = vi.fn().mockResolvedValue([{ total: 0 }]);
+    mocks.select.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({ where: countWhereOutOfRange }),
+    });
+
+    const emptyResultPage5 = await listContactSubmissions({ page: 5 });
+    expect(mocks.select).toHaveBeenCalledTimes(1);
+    expect(emptyResultPage5).toEqual({
+      items: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1,
+      isOutOfRange: true,
+    });
   });
 
   it("listDistinctContactServices kết hợp danh sách từ form công khai và giá trị tồn tại trong DB", async () => {
     const orderBy = vi
       .fn()
-      .mockResolvedValue([{ service: "hop-rau-tuan" }, { service: "dich-vu-cu" }]);
+      .mockResolvedValue([
+        { service: "hop-rau-tuan" },
+        { service: "   " },
+        { service: "dich-vu-cu" },
+      ]);
     const from = vi.fn().mockReturnValue({ orderBy });
     mocks.selectDistinct.mockReturnValue({ from });
 

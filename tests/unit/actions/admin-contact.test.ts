@@ -79,7 +79,31 @@ describe("updateContactSubmissionStatusAction Server Action", () => {
     );
     expect(invalidStatusResult.status).toBe("validation_error");
 
+    const emptyFormDataResult = await updateContactSubmissionStatusAction(
+      { status: "idle" },
+      new FormData()
+    );
+    expect(emptyFormDataResult.status).toBe("validation_error");
+
     expect(mocks.updateContactSubmissionStatus).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("trả về validation_error nếu lớp query từ chối dữ liệu", async () => {
+    mocks.updateContactSubmissionStatus.mockResolvedValueOnce({
+      ok: false,
+      reason: "validation",
+    });
+
+    const result = await updateContactSubmissionStatusAction(
+      { status: "idle" },
+      makeFormData(VALID_UUID, "contacted")
+    );
+
+    expect(result).toEqual({
+      status: "validation_error",
+      message: "Mã yêu cầu hoặc trạng thái xử lý không hợp lệ.",
+    });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 

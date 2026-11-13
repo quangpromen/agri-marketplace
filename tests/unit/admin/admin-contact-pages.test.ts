@@ -63,6 +63,7 @@ vi.mock("react-dom", async () => {
 
 import ProtectedAdminLayout from "@/app/(admin)/admin/(protected)/layout";
 import AdminContactListPage from "@/app/(admin)/admin/(protected)/lien-he/page";
+import AdminContactDetailNotFound from "@/app/(admin)/admin/(protected)/lien-he/[id]/not-found";
 import AdminContactDetailPage, {
   metadata as detailMetadata,
 } from "@/app/(admin)/admin/(protected)/lien-he/[id]/page";
@@ -281,5 +282,41 @@ describe("Admin contact pages & protection", () => {
     // Metadata has noIndex and no PII
     expect(detailMetadata.robots).toEqual({ index: false, follow: false });
     expect(JSON.stringify(detailMetadata)).not.toContain("khach@example.com");
+  });
+
+  it("trang chi tiết không hiển thị cảnh báo lỗi email khi đã gửi và giữ văn bản thuần nếu email/SĐT không an toàn để gắn liên kết", async () => {
+    mocks.getContactSubmissionById.mockResolvedValueOnce({
+      id: VALID_UUID,
+      name: "Trần An",
+      phone: "javascript:alert(1)",
+      email: "user@example.com?subject=inject",
+      service: "cung-ung-bep-an",
+      message: "Cần báo giá cung ứng rau sạch hàng tuần.",
+      status: "contacted",
+      emailStatus: "sent",
+      createdAt: new Date("2026-11-12T08:30:00Z"),
+      updatedAt: new Date("2026-11-12T09:00:00Z"),
+    });
+
+    const html = renderToStaticMarkup(
+      await AdminContactDetailPage({
+        params: { id: VALID_UUID },
+        searchParams: {},
+      })
+    );
+
+    expect(html).not.toContain("Email thông báo đã gửi thất bại");
+    expect(html).not.toContain('href="mailto:');
+    expect(html).not.toContain('href="tel:');
+    expect(html).toContain("user@example.com?subject=inject");
+    expect(html).toContain("javascript:alert(1)");
+  });
+
+  it("giao diện not-found hiển thị thông báo rõ ràng và liên kết quay lại danh sách", () => {
+    const html = renderToStaticMarkup(React.createElement(AdminContactDetailNotFound));
+
+    expect(html).toContain("Không tìm thấy yêu cầu tư vấn");
+    expect(html).toContain('href="/admin/lien-he"');
+    expect(html).toContain("Quay lại danh sách yêu cầu");
   });
 });
