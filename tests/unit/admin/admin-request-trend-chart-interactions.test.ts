@@ -6,6 +6,11 @@ const hookRuntime = vi.hoisted(() => ({
   states: [] as unknown[],
   refCursor: 0,
   refs: [] as Array<{ current: unknown }>,
+  effectCursor: 0,
+  effects: [] as Array<{
+    fn: () => void | (() => void);
+    cleanup?: void | (() => void);
+  }>,
 }));
 
 vi.mock("react", async () => {
@@ -35,6 +40,14 @@ vi.mock("react", async () => {
     return hookRuntime.refs[slot];
   });
 
+  const mockUseEffect = vi.fn((fn: () => void | (() => void)) => {
+    const slot = hookRuntime.effectCursor++;
+    hookRuntime.effects[slot] = {
+      ...hookRuntime.effects[slot],
+      fn,
+    };
+  });
+
   return {
     ...actual,
     default: {
@@ -42,10 +55,12 @@ vi.mock("react", async () => {
       useId: () => ":r1:",
       useRef: mockUseRef,
       useState: mockUseState,
+      useEffect: mockUseEffect,
     },
     useId: () => ":r1:",
     useRef: mockUseRef,
     useState: mockUseState,
+    useEffect: mockUseEffect,
   };
 });
 
@@ -118,6 +133,7 @@ describe("AdminRequestTrendChart real interactive handlers", () => {
   ) => {
     hookRuntime.stateCursor = 0;
     hookRuntime.refCursor = 0;
+    hookRuntime.effectCursor = 0;
     const tree = AdminRequestTrendChart({ trend, defaultActiveIndex });
 
     const bars = findElements(
@@ -165,6 +181,8 @@ describe("AdminRequestTrendChart real interactive handlers", () => {
     hookRuntime.states = [];
     hookRuntime.refCursor = 0;
     hookRuntime.refs = [];
+    hookRuntime.effectCursor = 0;
+    hookRuntime.effects = [];
   });
 
   it("xử lý hover, mouseLeave (unpinned/pinned), focus, blur, click toggle, roving tabindex và điều hướng mũi tên/Home/End/Escape", () => {
@@ -349,5 +367,84 @@ describe("AdminRequestTrendChart real interactive handlers", () => {
     view = renderChart();
     expect(view.tooltipNodes).toHaveLength(0);
     expect(view.liveAnnouncement).toBe("");
+  });
+
+  it("chuyển đổi responsive sang layout mobile qua matchMedia và giữ nguyên tương tác bàn phím/tooltip", () => {
+    let matchesMobile = true;
+    const listeners = new Set<() => void>();
+    const addEventListener = vi.fn((_event: string, listener: () => void) => {
+      listeners.add(listener);
+    });
+    const removeEventListener = vi.fn(
+      (_event: string, listener: () => void) => {
+        listeners.delete(listener);
+      }
+    );
+
+    vi.stubGlobal("window", {
+      matchMedia: vi.fn(() => ({
+        get matches() {
+          return matchesMobile;
+        },
+        addEventListener,
+        removeEventListener,
+      })),
+    });
+
+    try {
+      let view = renderChart();
+      for (const effect of hookRuntime.effects) {
+        effect.cleanup = effect.fn();
+      }
+      view = renderChart();
+
+      const mobileSvg = findElements(view.tree, (el) => el.type === "svg")[0]!;
+      expect((mobileSvg.props as { viewBox: string }).viewBox).toBe(
+        "0 0 304 204"
+      );
+
+      // Keyboard navigation & tooltip work identically in mobile view
+      const preventDefault = vi.fn();
+      view.handlers[5]!.onFocus();
+      view = renderChart();
+      expect(view.tooltipNodes).toHaveLength(1);
+      view.handlers[5]!.onKeyDown({ key: "Enter", preventDefault });
+      view = renderChart();
+      expect(view.tooltipNodes).toHaveLength(0);
+      view.handlers[5]!.onKeyDown({ key: "Enter", preventDefault });
+      view = renderChart();
+      expect(view.tooltipNodes).toHaveLength(1);
+
+      // Crossing >= 640px switches back to desktop viewBox
+      matchesMobile = false;
+      Array.from(listeners).forEach((listener) => listener());
+      view = renderChart();
+      const desktopSvg = findElements(
+        view.tree,
+        (el) => el.type === "svg"
+      )[0]!;
+      expect((desktopSvg.props as { viewBox: string }).viewBox).toBe(
+        "0 0 680 210"
+      );
+
+      // Cleanup detaches listener and legacy matchMedia without addEventListener is safe
+      for (const effect of hookRuntime.effects) {
+        if (typeof effect.cleanup === "function") {
+          effect.cleanup();
+        }
+      }
+      expect(removeEventListener).toHaveBeenCalledTimes(1);
+
+      vi.stubGlobal("window", {
+        matchMedia: vi.fn(() => ({ matches: false })),
+      });
+      const legacyCleanup = hookRuntime.effects[0]!.fn();
+      expect(legacyCleanup).toBeUndefined();
+
+      vi.stubGlobal("window", undefined);
+      expect(hookRuntime.effects[0]!.fn()).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

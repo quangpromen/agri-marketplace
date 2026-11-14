@@ -1,5 +1,7 @@
 import type { AdminDashboardTrendPoint } from "@/server/admin/dashboard";
 
+export type TrendChartViewportVariant = "desktop" | "mobile";
+
 export const TREND_CHART_WIDTH = 680;
 export const TREND_CHART_HEIGHT = 210;
 export const TREND_CHART_PADDING = {
@@ -14,9 +16,65 @@ export const TREND_PLOT_WIDTH =
 export const TREND_PLOT_HEIGHT =
   TREND_CHART_HEIGHT - TREND_CHART_PADDING.top - TREND_CHART_PADDING.bottom;
 
+export const TREND_MOBILE_CHART_WIDTH = 304;
+export const TREND_MOBILE_CHART_HEIGHT = 204;
+export const TREND_MOBILE_CHART_PADDING = {
+  top: 14,
+  right: 4,
+  bottom: 26,
+  left: 32,
+} as const;
+
+export const TREND_MOBILE_PLOT_WIDTH =
+  TREND_MOBILE_CHART_WIDTH -
+  TREND_MOBILE_CHART_PADDING.left -
+  TREND_MOBILE_CHART_PADDING.right;
+export const TREND_MOBILE_PLOT_HEIGHT =
+  TREND_MOBILE_CHART_HEIGHT -
+  TREND_MOBILE_CHART_PADDING.top -
+  TREND_MOBILE_CHART_PADDING.bottom;
+
 export const TREND_MAX_BAR_WIDTH = 22;
 export const TREND_ZERO_BAR_HEIGHT = 2;
 export const TREND_MIN_POSITIVE_BAR_HEIGHT = 4;
+
+type TrendChartDimensions = {
+  viewport: TrendChartViewportVariant;
+  chartWidth: number;
+  chartHeight: number;
+  plotWidth: number;
+  plotHeight: number;
+  padding: {
+    readonly top: number;
+    readonly right: number;
+    readonly bottom: number;
+    readonly left: number;
+  };
+};
+
+export function getTrendChartDimensions(
+  viewport: TrendChartViewportVariant = "desktop"
+): TrendChartDimensions {
+  if (viewport === "mobile") {
+    return {
+      viewport: "mobile",
+      chartWidth: TREND_MOBILE_CHART_WIDTH,
+      chartHeight: TREND_MOBILE_CHART_HEIGHT,
+      plotWidth: TREND_MOBILE_PLOT_WIDTH,
+      plotHeight: TREND_MOBILE_PLOT_HEIGHT,
+      padding: TREND_MOBILE_CHART_PADDING,
+    };
+  }
+
+  return {
+    viewport: "desktop",
+    chartWidth: TREND_CHART_WIDTH,
+    chartHeight: TREND_CHART_HEIGHT,
+    plotWidth: TREND_PLOT_WIDTH,
+    plotHeight: TREND_PLOT_HEIGHT,
+    padding: TREND_CHART_PADDING,
+  };
+}
 
 export type TrendBarYAxisTick = {
   value: number;
@@ -40,6 +98,17 @@ export type TrendBarPlotItem = {
 };
 
 export type TrendBarGeometry = {
+  viewport: TrendChartViewportVariant;
+  chartWidth: number;
+  chartHeight: number;
+  plotWidth: number;
+  plotHeight: number;
+  padding: {
+    readonly top: number;
+    readonly right: number;
+    readonly bottom: number;
+    readonly left: number;
+  };
   items: TrendBarPlotItem[];
   yTicks: TrendBarYAxisTick[];
   yMax: number;
@@ -138,7 +207,23 @@ export function computeNiceYAxis(maxCount: number): {
   };
 }
 
-function shouldShowXAxisLabel(index: number, total: number): boolean {
+function shouldShowXAxisLabel(
+  index: number,
+  total: number,
+  viewport: TrendChartViewportVariant = "desktop"
+): boolean {
+  if (viewport === "mobile") {
+    if (total <= 5) {
+      return true;
+    }
+    if (index === 0 || index === total - 1) {
+      return true;
+    }
+    const secondTick = Math.round((total - 1) / 3);
+    const thirdTick = Math.round(((total - 1) * 2) / 3);
+    return index === secondTick || index === thirdTick;
+  }
+
   if (total <= 6) {
     return true;
   }
@@ -180,8 +265,12 @@ export function buildRoundedTopBarPath(
  * Computes deterministic bar-chart geometry, integer Y ticks, and summary metrics.
  */
 export function buildTrendBarChartGeometry(
-  rawPoints: ReadonlyArray<AdminDashboardTrendPoint>
+  rawPoints: ReadonlyArray<AdminDashboardTrendPoint>,
+  viewport: TrendChartViewportVariant = "desktop"
 ): TrendBarGeometry {
+  const dimensions = getTrendChartDimensions(viewport);
+  const { chartWidth, chartHeight, plotWidth, plotHeight, padding } = dimensions;
+
   const sanitizedCounts = rawPoints.map((point) =>
     sanitizeNonNegativeCount(point.count)
   );
@@ -193,19 +282,25 @@ export function buildTrendBarChartGeometry(
   );
 
   const { yMax, ticks } = computeNiceYAxis(maxCount);
-  const baselineY = roundCoord(TREND_CHART_PADDING.top + TREND_PLOT_HEIGHT);
+  const baselineY = roundCoord(padding.top + plotHeight);
 
   const yTicks: TrendBarYAxisTick[] = ticks.map((value) => {
     const ratio = yMax > 0 ? value / yMax : 0;
     return {
       value,
-      y: roundCoord(baselineY - ratio * TREND_PLOT_HEIGHT),
+      y: roundCoord(baselineY - ratio * plotHeight),
     };
   });
 
   const pointCount = rawPoints.length;
   if (pointCount === 0) {
     return {
+      viewport,
+      chartWidth,
+      chartHeight,
+      plotWidth,
+      plotHeight,
+      padding,
       items: [],
       yTicks,
       yMax,
@@ -220,9 +315,9 @@ export function buildTrendBarChartGeometry(
     };
   }
 
-  const slotWidth = TREND_PLOT_WIDTH / pointCount;
+  const slotWidth = plotWidth / pointCount;
   const barWidth = roundCoord(
-    Math.min(TREND_MAX_BAR_WIDTH, Math.max(8, slotWidth * 0.56))
+    Math.min(TREND_MAX_BAR_WIDTH, Math.max(8, slotWidth * 0.58))
   );
 
   let latestPeakIndex = -1;
@@ -236,16 +331,16 @@ export function buildTrendBarChartGeometry(
       peakDayCount += 1;
     }
 
-    const slotX = roundCoord(TREND_CHART_PADDING.left + index * slotWidth);
+    const slotX = roundCoord(padding.left + index * slotWidth);
     const barX = roundCoord(slotX + (slotWidth - barWidth) / 2);
 
     const barHeight =
       safeCount > 0
         ? Math.min(
-            TREND_PLOT_HEIGHT,
+            plotHeight,
             Math.max(
               TREND_MIN_POSITIVE_BAR_HEIGHT,
-              roundCoord((safeCount / yMax) * TREND_PLOT_HEIGHT)
+              roundCoord((safeCount / yMax) * plotHeight)
             )
           )
         : TREND_ZERO_BAR_HEIGHT;
@@ -265,7 +360,7 @@ export function buildTrendBarChartGeometry(
       slotX,
       slotWidth: roundCoord(slotWidth),
       isPeak,
-      showXAxisLabel: shouldShowXAxisLabel(index, pointCount),
+      showXAxisLabel: shouldShowXAxisLabel(index, pointCount, viewport),
     };
   });
 
@@ -273,6 +368,12 @@ export function buildTrendBarChartGeometry(
     latestPeakIndex >= 0 ? items[latestPeakIndex] ?? null : null;
 
   return {
+    viewport,
+    chartWidth,
+    chartHeight,
+    plotWidth,
+    plotHeight,
+    padding,
     items,
     yTicks,
     yMax,

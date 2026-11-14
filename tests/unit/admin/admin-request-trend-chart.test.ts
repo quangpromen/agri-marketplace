@@ -7,6 +7,10 @@ import {
   TREND_CHART_PADDING,
   TREND_CHART_WIDTH,
   TREND_MAX_BAR_WIDTH,
+  TREND_MOBILE_CHART_HEIGHT,
+  TREND_MOBILE_CHART_PADDING,
+  TREND_MOBILE_CHART_WIDTH,
+  TREND_MOBILE_PLOT_HEIGHT,
   TREND_PLOT_HEIGHT,
   TREND_ZERO_BAR_HEIGHT,
   buildRoundedTopBarPath,
@@ -384,5 +388,82 @@ describe("admin-dashboard-chart bar geometry & AdminRequestTrendChart", () => {
     );
     expect(rightTallTooltipHtml).toContain("-translate-x-full");
     expect(rightTallTooltipHtml).toContain("1.250 yêu cầu tư vấn");
+  });
+
+  it("fit toàn bộ 14 cột gọn trong viewport mobile 375px không cần cuộn ngang và chỉ hiển thị 4 nhãn trục X chọn lọc", () => {
+    const sparseSeries = createFourteenDaySeries([
+      0, 0, 1, 0, 0, 8, 0, 0, 1, 0, 0, 0, 0, 0,
+    ]);
+    const mobileGeo = buildTrendBarChartGeometry(sparseSeries, "mobile");
+
+    expect(mobileGeo.viewport).toBe("mobile");
+    expect(mobileGeo.chartWidth).toBe(TREND_MOBILE_CHART_WIDTH);
+    expect(mobileGeo.chartHeight).toBe(TREND_MOBILE_CHART_HEIGHT);
+    expect(mobileGeo.plotHeight).toBe(TREND_MOBILE_PLOT_HEIGHT);
+    expect(mobileGeo.items).toHaveLength(14);
+    expect(mobileGeo.items[0]!.width).toBeGreaterThanOrEqual(10);
+    expect(mobileGeo.items[0]!.width).toBeLessThanOrEqual(14);
+
+    for (let index = 0; index < mobileGeo.items.length; index += 1) {
+      const item = mobileGeo.items[index]!;
+      expect(item.x).toBeGreaterThanOrEqual(TREND_MOBILE_CHART_PADDING.left);
+      expect(item.x + item.width).toBeLessThanOrEqual(
+        TREND_MOBILE_CHART_WIDTH - TREND_MOBILE_CHART_PADDING.right + 0.01
+      );
+      if (index > 0) {
+        const prev = mobileGeo.items[index - 1]!;
+        expect(item.x - (prev.x + prev.width)).toBeGreaterThanOrEqual(6);
+      }
+    }
+
+    const visibleMobileLabels = mobileGeo.items
+      .filter((item) => item.showXAxisLabel)
+      .map((item) => item.label);
+    expect(visibleMobileLabels).toEqual(["01/11", "05/11", "10/11", "14/11"]);
+
+    // Short <= 5 day series shows all X labels on mobile too
+    const shortMobileGeo = buildTrendBarChartGeometry(
+      sparseSeries.slice(0, 5),
+      "mobile"
+    );
+    expect(shortMobileGeo.items.every((item) => item.showXAxisLabel)).toBe(true);
+
+    // SSR check on mobile viewport: no horizontal scrolling container or min-w-[648px]
+    const mobileHtml = renderToStaticMarkup(
+      React.createElement(AdminRequestTrendChart, {
+        trend: sparseSeries,
+        defaultViewport: "mobile",
+        defaultActiveIndex: 5,
+      })
+    );
+    expect(mobileHtml).toContain(
+      `viewBox="0 0 ${TREND_MOBILE_CHART_WIDTH} ${TREND_MOBILE_CHART_HEIGHT}"`
+    );
+    expect(mobileHtml).not.toContain("min-w-[648px]");
+    expect(mobileHtml).not.toContain("overflow-x-auto");
+    expect(mobileHtml.match(/role="button"/g)).toHaveLength(14);
+    expect(mobileHtml.match(/tabindex="0"/g)).toHaveLength(1);
+    expect(mobileHtml.match(/tabindex="-1"/g)).toHaveLength(13);
+    expect(mobileHtml).toContain("06/11/2026");
+    expect(mobileHtml).toContain("-translate-x-1/2");
+
+    // Mobile edge-clamped tall bar tooltips (left side index 1, right side index 11)
+    const leftTallMobileHtml = renderToStaticMarkup(
+      React.createElement(AdminRequestTrendChart, {
+        trend: createFourteenDaySeries([0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        defaultViewport: "mobile",
+        defaultActiveIndex: 1,
+      })
+    );
+    expect(leftTallMobileHtml).toContain("translate-x-0");
+
+    const rightTallMobileHtml = renderToStaticMarkup(
+      React.createElement(AdminRequestTrendChart, {
+        trend: createFourteenDaySeries([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0]),
+        defaultViewport: "mobile",
+        defaultActiveIndex: 11,
+      })
+    );
+    expect(rightTallMobileHtml).toContain("-translate-x-full");
   });
 });

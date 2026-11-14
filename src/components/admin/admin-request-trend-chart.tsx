@@ -1,15 +1,12 @@
 "use client";
 
-import React, { useId, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import {
-  TREND_CHART_HEIGHT,
-  TREND_CHART_PADDING,
-  TREND_CHART_WIDTH,
-  TREND_PLOT_HEIGHT,
   buildRoundedTopBarPath,
   buildTrendBarChartGeometry,
   formatAveragePerDay,
   resolveTrendChartKeyboardAction,
+  type TrendChartViewportVariant,
 } from "@/lib/admin-dashboard-chart";
 import { cn, formatNumber } from "@/lib/utils";
 import type { AdminDashboardTrendPoint } from "@/server/admin/dashboard";
@@ -17,11 +14,13 @@ import type { AdminDashboardTrendPoint } from "@/server/admin/dashboard";
 interface AdminRequestTrendChartProps {
   trend: AdminDashboardTrendPoint[];
   defaultActiveIndex?: number | null;
+  defaultViewport?: TrendChartViewportVariant;
 }
 
 export function AdminRequestTrendChart({
   trend,
   defaultActiveIndex = null,
+  defaultViewport = "desktop",
 }: AdminRequestTrendChartProps) {
   const reactId = useId();
   const safeId = reactId.replace(/:/g, "");
@@ -30,7 +29,33 @@ export function AdminRequestTrendChart({
   const svgTitleId = `trend-svg-title-${safeId}`;
   const svgDescId = `trend-svg-desc-${safeId}`;
 
-  const geometry = buildTrendBarChartGeometry(trend);
+  const [viewport, setViewport] =
+    useState<TrendChartViewportVariant>(defaultViewport);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    ) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const syncViewport = () => {
+      setViewport(mediaQuery.matches ? "mobile" : "desktop");
+    };
+
+    syncViewport();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncViewport);
+      return () => mediaQuery.removeEventListener("change", syncViewport);
+    }
+    return undefined;
+  }, []);
+
+  const isMobileLayout = viewport === "mobile";
+  const geometry = buildTrendBarChartGeometry(trend, viewport);
   const pointCount = geometry.items.length;
 
   const validDefaultIndex =
@@ -151,22 +176,53 @@ export function AdminRequestTrendChart({
       return null;
     }
 
-    const isTallBar = activeItem.y < 68;
+    const isTallBar = activeItem.y < geometry.chartHeight * 0.33;
     if (isTallBar) {
+      if (isMobileLayout) {
+        if (activeItem.index <= 4) {
+          return {
+            style: {
+              left: `${((activeItem.x + activeItem.width + 6) / geometry.chartWidth) * 100}%`,
+              top: `${Math.max(4, Math.round((activeItem.y / geometry.chartHeight) * 100))}%`,
+            },
+            alignClass: "translate-x-0",
+          };
+        }
+
+        if (activeItem.index >= pointCount - 5) {
+          return {
+            style: {
+              left: `${((activeItem.x - 6) / geometry.chartWidth) * 100}%`,
+              top: `${Math.max(4, Math.round((activeItem.y / geometry.chartHeight) * 100))}%`,
+            },
+            alignClass: "-translate-x-full",
+          };
+        }
+
+        return {
+          style: {
+            left: "50%",
+            top: `${Math.max(4, Math.round((activeItem.y / geometry.chartHeight) * 100))}%`,
+          },
+          alignClass: "-translate-x-1/2",
+        };
+      }
+
       const placeOnLeft = activeItem.index >= pointCount - 4;
       return {
         style: {
           left: placeOnLeft
-            ? `${((activeItem.x - 8) / TREND_CHART_WIDTH) * 100}%`
-            : `${((activeItem.x + activeItem.width + 8) / TREND_CHART_WIDTH) * 100}%`,
-          top: `${Math.max(4, Math.round((activeItem.y / TREND_CHART_HEIGHT) * 100))}%`,
+            ? `${((activeItem.x - 8) / geometry.chartWidth) * 100}%`
+            : `${((activeItem.x + activeItem.width + 8) / geometry.chartWidth) * 100}%`,
+          top: `${Math.max(4, Math.round((activeItem.y / geometry.chartHeight) * 100))}%`,
         },
         alignClass: placeOnLeft ? "-translate-x-full" : "translate-x-0",
       };
     }
 
-    const isLeftEdge = activeItem.index <= 1;
-    const isRightEdge = activeItem.index >= pointCount - 2;
+    const edgeThreshold = isMobileLayout ? 4 : 2;
+    const isLeftEdge = activeItem.index < edgeThreshold;
+    const isRightEdge = activeItem.index >= pointCount - edgeThreshold;
     const leftValue = isLeftEdge
       ? activeItem.x
       : isRightEdge
@@ -175,11 +231,12 @@ export function AdminRequestTrendChart({
 
     return {
       style: {
-        left: `${(leftValue / TREND_CHART_WIDTH) * 100}%`,
+        left: `${(leftValue / geometry.chartWidth) * 100}%`,
         bottom: `${Math.min(
           86,
           Math.round(
-            ((TREND_CHART_HEIGHT - activeItem.y + 8) / TREND_CHART_HEIGHT) * 100
+            ((geometry.chartHeight - activeItem.y + 8) / geometry.chartHeight) *
+              100
           )
         )}%`,
       },
@@ -238,11 +295,11 @@ export function AdminRequestTrendChart({
         {liveAnnouncement}
       </p>
 
-      <div className="mt-3 w-full overflow-x-auto">
-        <div className="relative min-w-[648px] sm:min-w-0">
+      <div className="mt-3 w-full">
+        <div className="relative w-full">
           {geometry.totalRequests === 0 && pointCount > 0 ? (
-            <p className="pointer-events-none absolute inset-x-0 top-1/3 z-10 flex justify-center px-4">
-              <span className="rounded-full border border-border bg-cream/90 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <p className="pointer-events-none absolute inset-x-0 top-1/3 z-10 flex justify-center px-2 sm:px-4">
+              <span className="rounded-full border border-border bg-cream/90 px-3 py-1 text-center text-[11px] font-medium text-muted-foreground sm:text-xs">
                 Chưa ghi nhận yêu cầu mới trong 14 ngày gần đây.
               </span>
             </p>
@@ -253,7 +310,7 @@ export function AdminRequestTrendChart({
               aria-hidden="true"
               style={tooltipPlacement.style}
               className={cn(
-                "pointer-events-none absolute z-20 whitespace-nowrap rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground shadow-md transition-opacity duration-150 motion-reduce:transition-none",
+                "pointer-events-none absolute z-20 whitespace-nowrap rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] text-foreground shadow-md transition-opacity duration-150 motion-reduce:transition-none sm:px-3 sm:py-2 sm:text-xs",
                 tooltipPlacement.alignClass
               )}
             >
@@ -280,7 +337,7 @@ export function AdminRequestTrendChart({
           ) : null}
 
           <svg
-            viewBox={`0 0 ${TREND_CHART_WIDTH} ${TREND_CHART_HEIGHT}`}
+            viewBox={`0 0 ${geometry.chartWidth} ${geometry.chartHeight}`}
             role="group"
             aria-labelledby={svgTitleId}
             aria-describedby={svgDescId}
@@ -297,19 +354,19 @@ export function AdminRequestTrendChart({
                 return (
                   <g key={tick.value}>
                     <line
-                      x1={TREND_CHART_PADDING.left}
+                      x1={geometry.padding.left}
                       y1={tick.y}
-                      x2={TREND_CHART_WIDTH - TREND_CHART_PADDING.right}
+                      x2={geometry.chartWidth - geometry.padding.right}
                       y2={tick.y}
                       stroke={isBaseline ? "#D6D1C4" : "#EAE5DA"}
                       strokeWidth={1}
                     />
                     <text
-                      x={TREND_CHART_PADDING.left - 8}
+                      x={geometry.padding.left - (isMobileLayout ? 6 : 8)}
                       y={tick.y + 4}
                       textAnchor="end"
                       fill="#64776A"
-                      fontSize="11.5"
+                      fontSize={isMobileLayout ? "11" : "11.5"}
                       fontWeight="500"
                     >
                       {formatNumber(tick.value)}
@@ -321,6 +378,7 @@ export function AdminRequestTrendChart({
               {geometry.items.map((item) => {
                 const isActive = activeItem?.index === item.index;
                 const isFocused = focusedIndex === item.index;
+                const focusInset = isMobileLayout ? 3 : 4;
 
                 const barPath = buildRoundedTopBarPath(
                   item.x,
@@ -347,10 +405,10 @@ export function AdminRequestTrendChart({
                   <g key={`vis-${item.date}`}>
                     {isFocused ? (
                       <rect
-                        x={item.x - 4}
-                        y={TREND_CHART_PADDING.top + 1}
-                        width={item.width + 8}
-                        height={TREND_PLOT_HEIGHT - 2}
+                        x={item.x - focusInset}
+                        y={geometry.padding.top + 1}
+                        width={item.width + focusInset * 2}
+                        height={geometry.plotHeight - 2}
                         rx={6}
                         fill="#315C3B"
                         fillOpacity={0.04}
@@ -372,8 +430,14 @@ export function AdminRequestTrendChart({
 
                     {item.showXAxisLabel ? (
                       <text
-                        x={item.x + item.width / 2}
-                        y={geometry.baselineY + 19}
+                        x={
+                          item.index === 0
+                            ? item.x
+                            : item.index === pointCount - 1
+                              ? item.x + item.width
+                              : item.x + item.width / 2
+                        }
+                        y={geometry.baselineY + (isMobileLayout ? 17 : 19)}
                         textAnchor={
                           item.index === 0
                             ? "start"
@@ -382,7 +446,7 @@ export function AdminRequestTrendChart({
                               : "middle"
                         }
                         fill={isActive || isFocused ? "#17261C" : "#64776A"}
-                        fontSize="11.5"
+                        fontSize={isMobileLayout ? "11" : "11.5"}
                         fontWeight={isActive || isFocused ? "700" : "500"}
                       >
                         {item.label}
@@ -409,9 +473,9 @@ export function AdminRequestTrendChart({
                         barRefs.current[item.index] = element;
                       }}
                       x={item.slotX}
-                      y={TREND_CHART_PADDING.top}
+                      y={geometry.padding.top}
                       width={item.slotWidth}
-                      height={TREND_PLOT_HEIGHT}
+                      height={geometry.plotHeight}
                       rx={6}
                       fill="transparent"
                       tabIndex={isTabStop ? 0 : -1}
