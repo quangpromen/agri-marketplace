@@ -125,3 +125,65 @@ export function formatAdminDateTime(value: Date | string | null | undefined): st
   return adminDateTimeFormatter.format(date);
 }
 
+const MINUTE_IN_MS = 60_000;
+const HOUR_IN_MS = 60 * MINUTE_IN_MS;
+const DAY_IN_MS = 24 * HOUR_IN_MS;
+
+export function formatAdminRelativeTime(
+  value: Date | string | null | undefined,
+  referenceNow: Date | string = new Date()
+): string {
+  if (!value) {
+    return "—";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  const parsedRef =
+    referenceNow instanceof Date ? referenceNow : new Date(referenceNow);
+  const nowDate = Number.isNaN(parsedRef.getTime()) ? new Date() : parsedRef;
+  const diffMs = nowDate.getTime() - date.getTime();
+
+  if (diffMs < MINUTE_IN_MS) {
+    return "Vừa xong";
+  }
+
+  if (diffMs < HOUR_IN_MS) {
+    return `${Math.floor(diffMs / MINUTE_IN_MS)} phút trước`;
+  }
+
+  if (diffMs < DAY_IN_MS) {
+    return `${Math.floor(diffMs / HOUR_IN_MS)} giờ trước`;
+  }
+
+  const diffDays = Math.floor(diffMs / DAY_IN_MS);
+  if (diffDays < 7) {
+    return `${diffDays} ngày trước`;
+  }
+
+  if (diffDays < 30) {
+    return `${Math.floor(diffDays / 7)} tuần trước`;
+  }
+
+  return formatAdminDateTime(date);
+}
+
+export function formatNotificationBadgeCount(
+  unreadCount: number,
+  cap: number = 99
+): string | null {
+  if (!Number.isFinite(unreadCount) || unreadCount <= 0) {
+    return null;
+  }
+
+  const normalized = Math.floor(unreadCount);
+  if (normalized <= 0) {
+    return null;
+  }
+
+  return normalized > cap ? `${cap}+` : String(normalized);
+}
+

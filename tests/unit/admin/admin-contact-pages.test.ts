@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireAdmin: vi.fn(),
   getAdminDashboardData: vi.fn(),
+  getAdminNotificationSummary: vi.fn(),
   listContactSubmissions: vi.fn(),
   listDistinctContactServices: vi.fn(),
   getContactSubmissionById: vi.fn(),
@@ -28,6 +29,10 @@ vi.mock("@/server/auth/require-admin", () => ({
 
 vi.mock("@/server/admin/dashboard", () => ({
   getAdminDashboardData: mocks.getAdminDashboardData,
+}));
+
+vi.mock("@/server/admin/notifications", () => ({
+  getAdminNotificationSummary: mocks.getAdminNotificationSummary,
 }));
 
 vi.mock("@/server/admin/contact-submissions", () => ({
@@ -101,6 +106,20 @@ describe("Admin contact pages & protection", () => {
       },
     });
     mocks.getAdminDashboardData.mockReset();
+    mocks.getAdminNotificationSummary.mockReset().mockResolvedValue({
+      unreadCount: 2,
+      items: [
+        {
+          id: VALID_UUID,
+          customerName: "Nguyễn Văn An",
+          serviceLabel: "Mua nông sản / Hộp rau gia đình",
+          createdAt: "2026-11-12T08:30:00.000Z",
+          relativeTime: "5 phút trước",
+          detailUrl: `/admin/lien-he/${VALID_UUID}`,
+        },
+      ],
+      serverTime: "2026-11-12T08:35:00.000Z",
+    });
     mocks.listContactSubmissions.mockReset();
     mocks.listDistinctContactServices.mockReset().mockResolvedValue([
       { value: "hop-rau-tuan", label: "Mua nông sản / Hộp rau gia đình" },
@@ -133,18 +152,36 @@ describe("Admin contact pages & protection", () => {
     expect(mocks.getContactSubmissionById).not.toHaveBeenCalled();
   });
 
-  it("layout admin hiển thị điều hướng Tổng quan, Yêu cầu tư vấn, Đăng xuất và không rò rỉ session token", async () => {
+  it("layout admin hiển thị điều hướng Tổng quan, Yêu cầu tư vấn, chuông thông báo, Đăng xuất và không rò rỉ session token", async () => {
+    const element = await ProtectedAdminLayout({
+      children: React.createElement("div", null, "Nội dung"),
+    });
+    const html = renderToStaticMarkup(element);
+
+    expect(mocks.getAdminNotificationSummary).toHaveBeenCalledWith("admin-1");
+    expect(html).toContain("Tổng quan");
+    expect(html).toContain('href="/admin"');
+    expect(html).toContain("Yêu cầu tư vấn");
+    expect(html).toContain('href="/admin/lien-he"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).toContain("Thông báo yêu cầu tư vấn, 2 yêu cầu mới chưa xem");
+    expect(html).toContain("Đăng xuất");
+    expect(html).not.toContain(SECRET_SESSION_TOKEN);
+  });
+
+  it("layout admin vẫn render an toàn khi truy vấn tóm tắt thông báo gặp lỗi tạm thời", async () => {
+    mocks.getAdminNotificationSummary.mockRejectedValueOnce(
+      new Error("Temporary DB timeout")
+    );
+
     const element = await ProtectedAdminLayout({
       children: React.createElement("div", null, "Nội dung"),
     });
     const html = renderToStaticMarkup(element);
 
     expect(html).toContain("Tổng quan");
-    expect(html).toContain('href="/admin"');
-    expect(html).toContain("Yêu cầu tư vấn");
-    expect(html).toContain('href="/admin/lien-he"');
-    expect(html).toContain('aria-current="page"');
-    expect(html).toContain("Đăng xuất");
+    expect(html).toContain("Thông báo yêu cầu tư vấn, không có thông báo mới");
+    expect(html).not.toContain("Temporary DB timeout");
     expect(html).not.toContain(SECRET_SESSION_TOKEN);
   });
 

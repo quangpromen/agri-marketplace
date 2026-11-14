@@ -124,5 +124,69 @@ test.describe("xác thực trang quản trị", () => {
     await page.getByRole("button", { name: "Đăng xuất" }).click();
     await expect(page).toHaveURL(/\/admin\/login$/);
   });
+
+  test("endpoint /api/admin/notifications từ chối người dùng chưa đăng nhập với HTTP 401 và Cache-Control no-store", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/admin/notifications");
+    expect(response.status()).toBe(401);
+
+    const cacheControl = response.headers()["cache-control"] ?? "";
+    expect(cacheControl.toLowerCase()).toContain("no-store");
+
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body).toEqual({
+      error: "Chưa xác thực.",
+    });
+    expect(JSON.stringify(body)).not.toMatch(/stack|password|token|email|phone/i);
+  });
+
+  test("chuông thông báo quản trị hoạt động và đóng mở đúng trên giao diện đăng nhập thật (nếu cấu hình E2E env)", async ({
+    page,
+  }) => {
+    const e2eEmail = process.env.E2E_ADMIN_EMAIL;
+    const e2ePassword = process.env.E2E_ADMIN_PASSWORD;
+
+    test.skip(
+      !e2eEmail || !e2ePassword,
+      "Bỏ qua test chuông thông báo thật khi chưa cấu hình E2E_ADMIN_EMAIL và E2E_ADMIN_PASSWORD."
+    );
+
+    await page.goto("/admin/login", { waitUntil: "domcontentloaded" });
+
+    const form = page.getByRole("form", {
+      name: "Biểu mẫu đăng nhập quản trị Mộc Farm",
+    });
+
+    await form.getByLabel("Địa chỉ email").fill(e2eEmail!);
+    await form.getByLabel("Mật khẩu").fill(e2ePassword!);
+    await form.getByRole("button", { name: "Đăng nhập quản trị" }).click();
+    await expect(page).toHaveURL(/\/admin$/);
+
+    const bellButton = page.getByRole("button", {
+      name: /^Thông báo yêu cầu tư vấn,/i,
+    });
+    await expect(bellButton).toBeVisible();
+    await expect(bellButton).toHaveAttribute("aria-expanded", "false");
+
+    await bellButton.click();
+    await expect(bellButton).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      page.getByRole("heading", { name: "Thông báo mới" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Xem yêu cầu tư vấn mới" })
+    ).toHaveAttribute("href", "/admin/lien-he?status=new");
+
+    await page.keyboard.press("Escape");
+    await expect(bellButton).toHaveAttribute("aria-expanded", "false");
+    await expect(bellButton).toBeFocused();
+
+    await page.goto("/admin/lien-he", { waitUntil: "domcontentloaded" });
+    await expect(bellButton).toBeVisible();
+
+    await page.getByRole("button", { name: "Đăng xuất" }).click();
+    await expect(page).toHaveURL(/\/admin\/login$/);
+  });
 });
 

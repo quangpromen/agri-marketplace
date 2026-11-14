@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import React from "react";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { AdminNotificationBell } from "@/components/admin/admin-notification-bell";
 import { AdminLogoutButton } from "@/components/forms/admin-logout-button";
 import { Logo } from "@/components/shared/logo";
 import { Container } from "@/components/ui/container";
 import { constructMetadata } from "@/lib/metadata";
+import type { AdminNotificationSummary } from "@/schemas/admin-notifications";
+import { getAdminNotificationSummary } from "@/server/admin/notifications";
 import { requireAdmin } from "@/server/auth/require-admin";
+import { captureOperationalError } from "@/server/observability/capture-error";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,6 +27,16 @@ export default async function ProtectedAdminLayout({
 }>) {
   const { user } = await requireAdmin();
 
+  let initialNotificationSummary: AdminNotificationSummary | undefined;
+  try {
+    initialNotificationSummary = await getAdminNotificationSummary(user.id);
+  } catch (error) {
+    captureOperationalError(error, {
+      service: "neon",
+      operation: "get_admin_notification_summary_layout",
+    });
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-cream/40">
       <header className="border-b border-border bg-card">
@@ -38,11 +52,12 @@ export default async function ProtectedAdminLayout({
             <AdminNav />
           </div>
 
-          <div className="order-2 flex items-center gap-3 sm:gap-4 lg:order-3">
+          <div className="order-2 ml-auto flex items-center gap-2.5 sm:gap-3 lg:order-3 lg:ml-0">
             <div className="hidden text-right text-sm sm:block">
               <p className="max-w-[180px] truncate font-semibold text-foreground">{user.name}</p>
               <p className="max-w-[220px] truncate text-xs text-muted-foreground">{user.email}</p>
             </div>
+            <AdminNotificationBell initialSummary={initialNotificationSummary} />
             <AdminLogoutButton />
           </div>
         </Container>

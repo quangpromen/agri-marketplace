@@ -15,6 +15,20 @@
       "when": 1794498970007,
       "tag": "0001_pink_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794636313952,
+      "tag": "0002_flimsy_the_captain",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794675386196,
+      "tag": "0003_easy_thanos",
+      "breakpoints": true
     }
   ]
 }
