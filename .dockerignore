@@ -1,0 +1,15 @@
+.git
+.next
+.next-e2e
+node_modules
+coverage
+playwright-report
+test-results
+.cache
+report
+.env*
+!.env.example
+*.log
+Dockerfile*
+compose*.yaml
+compose*.yml
