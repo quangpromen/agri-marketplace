@@ -3,8 +3,9 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, LayoutDashboard } from "lucide-react";
+import { ClipboardList, Inbox, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ADMIN_AUDIT_LOGS_PATH } from "@/schemas/admin-audit";
 import { ADMIN_CONTACTS_PATH } from "@/schemas/admin-contact";
 import { ADMIN_DASHBOARD_PATH } from "@/schemas/auth";
 
@@ -22,6 +23,14 @@ const adminNavItems = [
     match: (pathname: string) =>
       pathname === ADMIN_CONTACTS_PATH ||
       pathname.startsWith(`${ADMIN_CONTACTS_PATH}/`),
+  },
+  {
+    href: ADMIN_AUDIT_LOGS_PATH,
+    label: "Nhật ký hoạt động",
+    icon: ClipboardList,
+    match: (pathname: string) =>
+      pathname === ADMIN_AUDIT_LOGS_PATH ||
+      pathname.startsWith(`${ADMIN_AUDIT_LOGS_PATH}/`),
   },
 ] as const;
 

@@ -530,63 +530,39 @@ describe("admin notifications database queries (Drizzle + PgDialect)", () => {
   it("markAllAdminNotificationsSeen dùng db.batch chèn read receipts ON CONFLICT DO NOTHING, cập nhật state admin hiện tại và không chạm contact_submissions", async () => {
     const updatedAt = new Date("2026-11-14T10:05:00.000Z");
 
-    // Mock inner subquery + select().from(contactSubmissions).where(notExists)
-    const innerWhere = vi.fn().mockReturnValue(createFakeQuery("unreadSubquery"));
-    const innerFrom = vi.fn().mockReturnValue({ where: innerWhere });
-
-    const receiptSelectQuery = createFakeQuery("receiptSelectQuery");
-    const receiptWhere = vi.fn().mockReturnValue(receiptSelectQuery);
-    const receiptFrom = vi.fn().mockReturnValue({ where: receiptWhere });
-
-    mocks.select
-      .mockReturnValueOnce({ from: innerFrom })
-      .mockReturnValueOnce({ from: receiptFrom });
-
-    // Mock insert(adminNotificationReads).select(...).onConflictDoNothing(...)
-    const insertReadsBatchItem = createFakeQuery("insertReadsBatchItem");
-    const onConflictDoNothing = vi.fn().mockReturnValue(insertReadsBatchItem);
-    const insertSelect = vi.fn().mockReturnValue({ onConflictDoNothing });
-
-    // Mock insert(adminNotificationStates).values(...).onConflictDoUpdate(...).returning(...)
-    const upsertStateBatchItem = createFakeQuery("upsertStateBatchItem");
-    const returning = vi.fn().mockReturnValue(upsertStateBatchItem);
-    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
-    const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
-
-    mocks.insert
-      .mockReturnValueOnce({ select: insertSelect })
-      .mockReturnValueOnce({ values });
-
-    mocks.batch.mockResolvedValueOnce([
-      { rowCount: 3 },
-      [{ adminUserId: "admin-2", lastSeenAt: updatedAt }],
-    ]);
+    mocks.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          adminUserId: "admin-2",
+          lastSeenAt: updatedAt,
+          receiptsCreated: 3,
+          auditLogId: "550e8400-e29b-41d4-a716-446655440088",
+        },
+      ],
+    });
 
     const result = await markAllAdminNotificationsSeen("admin-2");
 
-    expect(mocks.insert).toHaveBeenNthCalledWith(1, adminNotificationReads);
-    expect(mocks.insert).toHaveBeenNthCalledWith(2, adminNotificationStates);
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
     expect(mocks.insert).not.toHaveBeenCalledWith(contactSubmissions);
     expect(mocks.update).not.toHaveBeenCalled();
 
-    expect(onConflictDoNothing).toHaveBeenCalledWith({
-      target: [
-        adminNotificationReads.adminUserId,
-        adminNotificationReads.contactSubmissionId,
-      ],
-    });
-    expect(values).toHaveBeenCalledWith(
-      expect.objectContaining({
-        adminUserId: "admin-2",
-      })
+    const compiledCte = pgDialect.sqlToQuery(
+      mocks.execute.mock.calls[0]?.[0] as SQL
     );
-    expect(mocks.batch).toHaveBeenCalledWith([
-      insertReadsBatchItem,
-      upsertStateBatchItem,
-    ]);
+    expect(compiledCte.sql).toContain('INSERT INTO "admin_notification_reads"');
+    expect(compiledCte.sql).toContain(
+      'ON CONFLICT ("admin_user_id", "contact_submission_id") DO NOTHING'
+    );
+    expect(compiledCte.sql).toContain('INSERT INTO "admin_notification_states"');
+    expect(compiledCte.sql).toContain('INSERT INTO "admin_audit_logs"');
+    expect(compiledCte.sql).not.toContain('UPDATE "contact_submissions"');
+    expect(compiledCte.params).toContain("admin-2");
+    expect(compiledCte.params).toContain("notifications.mark_all_seen");
     expect(result).toEqual({
       ok: true,
       lastSeenAt: updatedAt.toISOString(),
+      receiptsCreated: 3,
     });
   });
 

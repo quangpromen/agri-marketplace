@@ -17,6 +17,7 @@ import {
   markAllNotificationsSeenSchema,
 } from "@/schemas/admin-notifications";
 import { getContactServiceLabel } from "@/schemas/contact";
+import { prepareMarkAllNotificationsAuditContext } from "@/server/admin/audit-log";
 
 type UnreadSubmissionRow = {
   id: string;
@@ -239,63 +240,126 @@ export async function getAdminNotificationSummary(
 }
 
 export async function markAllAdminNotificationsSeen(
-  adminUserId: string
-): Promise<{ ok: true; lastSeenAt: string }> {
+  adminUserId: string,
+  actor?: {
+    name?: string | null;
+    email?: string | null;
+  }
+): Promise<{ ok: true; lastSeenAt: string; receiptsCreated: number }> {
   const parsed = markAllNotificationsSeenSchema.parse({ adminUserId });
+  const auditContext = prepareMarkAllNotificationsAuditContext({
+    userId: parsed.adminUserId,
+    name: actor?.name,
+    email: actor?.email,
+  });
 
-  const insertReceiptsQuery = db
-    .insert(adminNotificationReads)
-    .select(
-      db
-        .select({
-          adminUserId: sql<string>`CAST(${parsed.adminUserId} AS text)`.as(
-            "admin_user_id"
-          ),
-          contactSubmissionId: contactSubmissions.id,
-          readAt: sql<Date>`now()`.as("read_at"),
-        })
-        .from(contactSubmissions)
-        .where(buildUnreadNotExistsCondition(parsed.adminUserId))
+  const cteResult = await db.execute(sql`
+    WITH inserted_reads AS (
+      INSERT INTO "admin_notification_reads" (
+        "admin_user_id",
+        "contact_submission_id",
+        "read_at"
+      )
+      SELECT
+        ${auditContext.actorUserId},
+        "cs"."id",
+        now()
+      FROM "contact_submissions" AS "cs"
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM "admin_notification_reads" AS "r"
+        WHERE "r"."admin_user_id" = ${auditContext.actorUserId}
+          AND "r"."contact_submission_id" = "cs"."id"
+      )
+      ON CONFLICT ("admin_user_id", "contact_submission_id") DO NOTHING
+      RETURNING 1
+    ),
+    receipt_summary AS (
+      SELECT COUNT(*)::int AS "receipts_created"
+      FROM "inserted_reads"
+    ),
+    upserted_state AS (
+      INSERT INTO "admin_notification_states" (
+        "admin_user_id",
+        "last_seen_at",
+        "created_at",
+        "updated_at"
+      )
+      VALUES (${auditContext.actorUserId}, now(), now(), now())
+      ON CONFLICT ("admin_user_id") DO UPDATE SET
+        "last_seen_at" = now(),
+        "updated_at" = now()
+      RETURNING "admin_user_id", "last_seen_at"
+    ),
+    actor_profile AS (
+      SELECT
+        "id",
+        LEFT(TRIM("name"), 100) AS "name",
+        LEFT(LOWER(TRIM("email")), 254) AS "email"
+      FROM "user"
+      WHERE "id" = ${auditContext.actorUserId}
+      LIMIT 1
+    ),
+    inserted_audit AS (
+      INSERT INTO "admin_audit_logs" (
+        "actor_user_id",
+        "actor_name_snapshot",
+        "actor_email_snapshot",
+        "action",
+        "target_type",
+        "target_id",
+        "result",
+        "changes",
+        "metadata",
+        "created_at"
+      )
+      SELECT
+        "upserted_state"."admin_user_id",
+        COALESCE(${auditContext.actorNameSnapshot}, "actor_profile"."name"),
+        COALESCE(${auditContext.actorEmailSnapshot}, "actor_profile"."email"),
+        ${auditContext.action},
+        ${auditContext.targetType},
+        "upserted_state"."admin_user_id",
+        ${auditContext.result},
+        NULL,
+        jsonb_build_object(
+          'receiptsCreated',
+          "receipt_summary"."receipts_created"
+        ),
+        "upserted_state"."last_seen_at"
+      FROM "upserted_state"
+      CROSS JOIN "receipt_summary"
+      LEFT JOIN "actor_profile"
+        ON "actor_profile"."id" = "upserted_state"."admin_user_id"
+      RETURNING "id"
     )
-    .onConflictDoNothing({
-      target: [
-        adminNotificationReads.adminUserId,
-        adminNotificationReads.contactSubmissionId,
-      ],
-    });
+    SELECT
+      "upserted_state"."admin_user_id" AS "adminUserId",
+      "upserted_state"."last_seen_at" AS "lastSeenAt",
+      "receipt_summary"."receipts_created" AS "receiptsCreated",
+      "inserted_audit"."id" AS "auditLogId"
+    FROM "upserted_state"
+    CROSS JOIN "receipt_summary"
+    INNER JOIN "inserted_audit"
+      ON TRUE
+  `);
 
-  const upsertStateQuery = db
-    .insert(adminNotificationStates)
-    .values({
-      adminUserId: parsed.adminUserId,
-      lastSeenAt: sql`now()`,
-      createdAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .onConflictDoUpdate({
-      target: adminNotificationStates.adminUserId,
-      set: {
-        lastSeenAt: sql`now()`,
-        updatedAt: sql`now()`,
-      },
-    })
-    .returning({
-      adminUserId: adminNotificationStates.adminUserId,
-      lastSeenAt: adminNotificationStates.lastSeenAt,
-    });
-
-  const [, updatedRows] = await db.batch([
-    insertReceiptsQuery,
-    upsertStateQuery,
-  ]);
-
-  const updatedState = updatedRows[0];
-  if (!updatedState) {
+  const [updatedState] = extractExecuteRows(cteResult);
+  if (!updatedState || !updatedState.auditLogId) {
     throw new Error("Không thể cập nhật trạng thái đã xem thông báo.");
   }
 
+  const rawReceiptsCreated = Number(updatedState.receiptsCreated ?? 0);
+  const receiptsCreated =
+    Number.isFinite(rawReceiptsCreated) && rawReceiptsCreated >= 0
+      ? Math.floor(rawReceiptsCreated)
+      : 0;
+
   return {
     ok: true,
-    lastSeenAt: toValidDate(updatedState.lastSeenAt).toISOString(),
+    lastSeenAt: toValidDate(
+      updatedState.lastSeenAt as Date | string
+    ).toISOString(),
+    receiptsCreated,
   };
 }

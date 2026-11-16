@@ -1,5 +1,6 @@
 import {
   index,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -71,6 +72,31 @@ export const adminNotificationReads = pgTable(
     index("admin_notification_reads_contact_submission_id_idx").on(
       table.contactSubmissionId
     ),
+  ]
+);
+
+export const adminAuditLogs = pgTable(
+  "admin_audit_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorUserId: text("actor_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    actorNameSnapshot: varchar("actor_name_snapshot", { length: 100 }),
+    actorEmailSnapshot: varchar("actor_email_snapshot", { length: 254 }),
+    action: varchar("action", { length: 64 }).notNull(),
+    targetType: varchar("target_type", { length: 64 }),
+    targetId: text("target_id"),
+    result: varchar("result", { length: 16 }).notNull(),
+    changes: jsonb("changes").$type<Record<string, unknown> | null>(),
+    metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("admin_audit_logs_created_at_id_idx").on(table.createdAt, table.id),
+    index("admin_audit_logs_actor_user_id_idx").on(table.actorUserId),
+    index("admin_audit_logs_action_idx").on(table.action),
+    index("admin_audit_logs_result_idx").on(table.result),
   ]
 );
 

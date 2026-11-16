@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
 const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   selectDistinct: vi.fn(),
   update: vi.fn(),
+  execute: vi.fn(),
+  requireAdmin: vi.fn(),
 }));
 
 vi.mock("@/db/client", () => ({
@@ -12,7 +15,12 @@ vi.mock("@/db/client", () => ({
     select: mocks.select,
     selectDistinct: mocks.selectDistinct,
     update: mocks.update,
+    execute: mocks.execute,
   },
+}));
+
+vi.mock("@/server/auth/require-admin", () => ({
+  requireAdmin: mocks.requireAdmin,
 }));
 
 import { contactSubmissions } from "@/db/schema";
@@ -33,6 +41,19 @@ describe("admin contact-submissions database queries", () => {
     mocks.select.mockReset();
     mocks.selectDistinct.mockReset();
     mocks.update.mockReset();
+    mocks.execute.mockReset();
+    mocks.requireAdmin.mockReset().mockResolvedValue({
+      user: {
+        id: "admin-1",
+        name: "Quản trị viên",
+        email: "admin@mocfarm.vn",
+      },
+      session: {
+        id: "sess-1",
+        userId: "admin-1",
+        token: "tok-1",
+      },
+    });
   });
 
   it("escape ký tự wildcard SQL LIKE (%, _, \\) đúng chuẩn", () => {
@@ -372,37 +393,43 @@ describe("admin contact-submissions database queries", () => {
     expect(
       await updateContactSubmissionStatus({ id: VALID_UUID, status: "invalid" })
     ).toEqual({ ok: false, reason: "validation" });
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.execute).not.toHaveBeenCalled();
 
     const updatedAt = new Date("2026-11-13T09:00:00Z");
-    const returning = vi
-      .fn()
-      .mockResolvedValue([{ id: VALID_UUID, status: "resolved", updatedAt }]);
-    const where = vi.fn().mockReturnValue({ returning });
-    const set = vi.fn().mockReturnValue({ where });
-    mocks.update.mockReturnValueOnce({ set });
+    mocks.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: VALID_UUID,
+          status: "resolved",
+          updatedAt,
+          statusChanged: true,
+          auditLogId: "550e8400-e29b-41d4-a716-446655440099",
+        },
+      ],
+    });
 
     const successResult = await updateContactSubmissionStatus({
       id: VALID_UUID,
       status: "resolved",
     });
 
-    expect(mocks.update).toHaveBeenCalledWith(contactSubmissions);
-    const setArg = set.mock.calls[0][0] as Record<string, unknown>;
-    expect(setArg.status).toBe("resolved");
-    expect(setArg.updatedAt).toBeInstanceOf(Date);
-    expect("emailStatus" in setArg).toBe(false);
+    expect(mocks.execute).toHaveBeenCalledTimes(1);
+    const cteSql = pgDialect.sqlToQuery(
+      mocks.execute.mock.calls[0]?.[0] as SQL
+    );
+    expect(cteSql.sql).toContain('UPDATE "contact_submissions"');
+    expect(cteSql.sql).toContain('"status" = CAST(');
+    expect(cteSql.sql).toContain('"updated_at" = now()');
+    expect(cteSql.sql).not.toContain('"email_status"');
+    expect(cteSql.sql).toContain('INSERT INTO "admin_audit_logs"');
+    expect(cteSql.params).toContain(VALID_UUID);
+    expect(cteSql.params).toContain("resolved");
     expect(successResult).toEqual({
       ok: true,
-      data: { id: VALID_UUID, status: "resolved", updatedAt },
+      data: { id: VALID_UUID, status: "resolved", updatedAt, changed: true },
     });
 
-    const emptyReturning = vi.fn().mockResolvedValue([]);
-    mocks.update.mockReturnValueOnce({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({ returning: emptyReturning }),
-      }),
-    });
+    mocks.execute.mockResolvedValueOnce({ rows: [] });
 
     expect(
       await updateContactSubmissionStatus({ id: VALID_UUID, status: "spam" })

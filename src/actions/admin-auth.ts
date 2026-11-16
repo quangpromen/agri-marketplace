@@ -4,12 +4,19 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import {
+  ADMIN_AUDIT_ACTIONS,
+  ADMIN_AUDIT_RESULTS,
+  ADMIN_AUDIT_TARGET_TYPES,
+} from "@/schemas/admin-audit";
+import {
   ADMIN_LOGIN_PATH,
   adminLoginSchema,
   GENERIC_AUTH_SERVICE_ERROR_MESSAGE,
   GENERIC_INVALID_CREDENTIALS_MESSAGE,
   sanitizeCallbackUrl,
 } from "@/schemas/auth";
+import { writeBestEffortAdminAuditLog } from "@/server/admin/audit-log";
+import { getSession } from "@/server/auth/get-session";
 
 export type AdminLoginFieldName = "email" | "password" | "callbackURL";
 
@@ -102,7 +109,11 @@ export async function loginAdmin(
     };
   }
 
-  let isAuthenticated = false;
+  let authenticatedUser: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+  } | null = null;
 
   try {
     const response = await auth.api.signInEmail({
@@ -113,17 +124,55 @@ export async function loginAdmin(
       headers: new Headers(headers()),
     });
 
-    if (response && response.user) {
-      isAuthenticated = true;
+    if (response && response.user && typeof response.user.id === "string") {
+      authenticatedUser = {
+        id: response.user.id,
+        name: response.user.name,
+        email: response.user.email,
+      };
     }
   } catch (error) {
     if (isCredentialAuthFailure(error)) {
+      await writeBestEffortAdminAuditLog(
+        {
+          action: ADMIN_AUDIT_ACTIONS.AUTH_LOGIN_FAILED,
+          result: ADMIN_AUDIT_RESULTS.FAILURE,
+          targetType: ADMIN_AUDIT_TARGET_TYPES.ADMIN_SESSION,
+          targetId: null,
+          actorUserId: null,
+          actorNameSnapshot: null,
+          actorEmailSnapshot: parsed.data.email,
+          changes: null,
+          metadata: {
+            reason: "invalid_credentials",
+          },
+        },
+        "audit_admin_login_failed"
+      );
+
       return {
         status: "error",
         message: GENERIC_INVALID_CREDENTIALS_MESSAGE,
         submittedEmail: parsed.data.email,
       };
     }
+
+    await writeBestEffortAdminAuditLog(
+      {
+        action: ADMIN_AUDIT_ACTIONS.AUTH_LOGIN_FAILED,
+        result: ADMIN_AUDIT_RESULTS.FAILURE,
+        targetType: ADMIN_AUDIT_TARGET_TYPES.ADMIN_SESSION,
+        targetId: null,
+        actorUserId: null,
+        actorNameSnapshot: null,
+        actorEmailSnapshot: parsed.data.email,
+        changes: null,
+        metadata: {
+          reason: "auth_service_error",
+        },
+      },
+      "audit_admin_login_failed"
+    );
 
     return {
       status: "error",
@@ -132,7 +181,24 @@ export async function loginAdmin(
     };
   }
 
-  if (!isAuthenticated) {
+  if (!authenticatedUser) {
+    await writeBestEffortAdminAuditLog(
+      {
+        action: ADMIN_AUDIT_ACTIONS.AUTH_LOGIN_FAILED,
+        result: ADMIN_AUDIT_RESULTS.FAILURE,
+        targetType: ADMIN_AUDIT_TARGET_TYPES.ADMIN_SESSION,
+        targetId: null,
+        actorUserId: null,
+        actorNameSnapshot: null,
+        actorEmailSnapshot: parsed.data.email,
+        changes: null,
+        metadata: {
+          reason: "invalid_credentials",
+        },
+      },
+      "audit_admin_login_failed"
+    );
+
     return {
       status: "error",
       message: GENERIC_INVALID_CREDENTIALS_MESSAGE,
@@ -140,17 +206,50 @@ export async function loginAdmin(
     };
   }
 
+  await writeBestEffortAdminAuditLog(
+    {
+      action: ADMIN_AUDIT_ACTIONS.AUTH_LOGIN_SUCCEEDED,
+      result: ADMIN_AUDIT_RESULTS.SUCCESS,
+      targetType: ADMIN_AUDIT_TARGET_TYPES.ADMIN_SESSION,
+      targetId: null,
+      actorUserId: authenticatedUser.id,
+      actorNameSnapshot: authenticatedUser.name ?? null,
+      actorEmailSnapshot: authenticatedUser.email ?? parsed.data.email,
+      changes: null,
+      metadata: null,
+    },
+    "audit_admin_login_succeeded"
+  );
+
   return redirect(sanitizeCallbackUrl(parsed.data.callbackURL)) as never;
 }
 
 export async function logoutAdmin(): Promise<void> {
+  const requestHeaders = new Headers(headers());
+  const existingSession = await getSession(requestHeaders);
+
   try {
     await auth.api.signOut({
-      headers: new Headers(headers()),
+      headers: requestHeaders,
     });
   } catch {
     // Luôn chuyển hướng về trang đăng nhập kể cả khi session đã hết hạn trước đó.
   }
+
+  await writeBestEffortAdminAuditLog(
+    {
+      action: ADMIN_AUDIT_ACTIONS.AUTH_LOGOUT_SUCCEEDED,
+      result: ADMIN_AUDIT_RESULTS.SUCCESS,
+      targetType: ADMIN_AUDIT_TARGET_TYPES.ADMIN_SESSION,
+      targetId: null,
+      actorUserId: existingSession?.user.id ?? null,
+      actorNameSnapshot: existingSession?.user.name ?? null,
+      actorEmailSnapshot: existingSession?.user.email ?? null,
+      changes: null,
+      metadata: null,
+    },
+    "audit_admin_logout_succeeded"
+  );
 
   return redirect(ADMIN_LOGIN_PATH) as never;
 }

@@ -1,8 +1,9 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, gte, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { contactSubmissions } from "@/db/schema";
+import type { AdminAuditActorInput } from "@/schemas/admin-audit";
 import {
   ADMIN_CONTACT_PAGE_SIZE,
   OPEN_CONTACT_SUBMISSION_STATUSES,
@@ -14,6 +15,8 @@ import {
   updateContactStatusSchema,
 } from "@/schemas/admin-contact";
 import { contactServiceValues, getContactServiceLabel } from "@/schemas/contact";
+import { prepareContactStatusChangeAuditContext } from "@/server/admin/audit-log";
+import { requireAdmin } from "@/server/auth/require-admin";
 
 export type ContactSubmissionListItem = {
   id: string;
@@ -52,12 +55,48 @@ export type UpdateContactSubmissionStatusResult =
         id: string;
         status: ContactSubmissionStatus;
         updatedAt: Date;
+        changed?: boolean;
       };
     }
   | {
       ok: false;
       reason: "validation" | "not_found";
     };
+
+function extractExecuteRows(result: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(result)) {
+    return result as Array<Record<string, unknown>>;
+  }
+
+  if (
+    result &&
+    typeof result === "object" &&
+    "rows" in result &&
+    Array.isArray((result as { rows?: unknown }).rows)
+  ) {
+    return (result as { rows: Array<Record<string, unknown>> }).rows;
+  }
+
+  return [];
+}
+
+function toValidDate(
+  value: Date | string | null | undefined,
+  fallback: Date = new Date()
+): Date {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
 
 export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
@@ -239,36 +278,133 @@ export async function getContactSubmissionById(
   return submission ?? null;
 }
 
-export async function updateContactSubmissionStatus(input: {
-  id: string;
-  status: string;
-}): Promise<UpdateContactSubmissionStatusResult> {
+export async function updateContactSubmissionStatus(
+  input: {
+    id: string;
+    status: string;
+  },
+  actor?: AdminAuditActorInput
+): Promise<UpdateContactSubmissionStatusResult> {
   const parsed = updateContactStatusSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, reason: "validation" };
   }
 
+  const resolvedActor: AdminAuditActorInput =
+    actor ??
+    (await (async () => {
+      const { user } = await requireAdmin();
+      return {
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+      };
+    })());
+
+  const auditContext = prepareContactStatusChangeAuditContext({
+    actor: resolvedActor,
+    targetId: parsed.data.id,
+    toStatus: parsed.data.status,
+  });
+
   const now = new Date();
 
-  const [updated] = await db
-    .update(contactSubmissions)
-    .set({
-      status: parsed.data.status,
-      updatedAt: now,
-    })
-    .where(eq(contactSubmissions.id, parsed.data.id))
-    .returning({
-      id: contactSubmissions.id,
-      status: contactSubmissions.status,
-      updatedAt: contactSubmissions.updatedAt,
-    });
+  const cteResult = await db.execute(sql`
+    WITH target_submission AS (
+      SELECT
+        "id",
+        "status"::text AS "previous_status",
+        "updated_at"
+      FROM "contact_submissions"
+      WHERE "id" = CAST(${auditContext.targetId} AS uuid)
+      FOR UPDATE
+    ),
+    updated_submission AS (
+      UPDATE "contact_submissions" AS "cs"
+      SET
+        "status" = CAST(${auditContext.toStatus} AS "contact_submission_status"),
+        "updated_at" = now()
+      FROM "target_submission"
+      WHERE "cs"."id" = "target_submission"."id"
+        AND "target_submission"."previous_status" <> ${auditContext.toStatus}
+      RETURNING
+        "cs"."id",
+        "cs"."status"::text AS "status",
+        "cs"."updated_at" AS "updated_at",
+        "target_submission"."previous_status" AS "previous_status"
+    ),
+    inserted_audit AS (
+      INSERT INTO "admin_audit_logs" (
+        "actor_user_id",
+        "actor_name_snapshot",
+        "actor_email_snapshot",
+        "action",
+        "target_type",
+        "target_id",
+        "result",
+        "changes",
+        "metadata",
+        "created_at"
+      )
+      SELECT
+        ${auditContext.actorUserId},
+        ${auditContext.actorNameSnapshot},
+        ${auditContext.actorEmailSnapshot},
+        ${auditContext.action},
+        ${auditContext.targetType},
+        "updated_submission"."id"::text,
+        ${auditContext.result},
+        jsonb_build_object(
+          'status',
+          jsonb_build_object(
+            'from', "updated_submission"."previous_status",
+            'to', "updated_submission"."status"
+          )
+        ),
+        NULL,
+        "updated_submission"."updated_at"
+      FROM "updated_submission"
+      RETURNING "id"
+    )
+    SELECT
+      "target_submission"."id" AS "id",
+      COALESCE("updated_submission"."status", "target_submission"."previous_status") AS "status",
+      COALESCE("updated_submission"."updated_at", "target_submission"."updated_at") AS "updatedAt",
+      ("updated_submission"."id" IS NOT NULL) AS "statusChanged",
+      "inserted_audit"."id" AS "auditLogId"
+    FROM "target_submission"
+    LEFT JOIN "updated_submission"
+      ON "updated_submission"."id" = "target_submission"."id"
+    LEFT JOIN "inserted_audit"
+      ON TRUE
+  `);
 
-  if (!updated) {
+  const [row] = extractExecuteRows(cteResult);
+
+  if (!row || typeof row.id !== "string") {
     return { ok: false, reason: "not_found" };
   }
 
+  const statusChanged =
+    row.statusChanged === true ||
+    row.statusChanged === "t" ||
+    row.statusChanged === 1;
+
+  if (statusChanged && !row.auditLogId) {
+    throw new Error("Không thể ghi nhận nhật ký thay đổi trạng thái yêu cầu tư vấn.");
+  }
+
+  const parsedUpdatedStatus = updateContactStatusSchema.shape.status.parse(
+    row.status
+  );
+
   return {
     ok: true,
-    data: updated,
+    data: {
+      id: row.id,
+      status: parsedUpdatedStatus,
+      updatedAt: toValidDate(row.updatedAt as Date | string, now),
+      changed: statusChanged,
+    },
   };
 }
