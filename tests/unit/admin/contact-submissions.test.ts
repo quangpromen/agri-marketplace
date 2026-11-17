@@ -435,5 +435,112 @@ describe("admin contact-submissions database queries", () => {
       await updateContactSubmissionStatus({ id: VALID_UUID, status: "spam" })
     ).toEqual({ ok: false, reason: "not_found" });
   });
+
+  it("yêu cầu xác thực admin trước khi chạm DB, ghi đúng actor/changes trong 1 câu CTE nguyên tử và xử lý trạng thái trùng lặp hoặc thiếu auditLogId", async () => {
+    const callOrder: string[] = [];
+
+    mocks.requireAdmin.mockRejectedValueOnce(
+      new Error("NEXT_REDIRECT:/admin/login")
+    );
+    await expect(
+      updateContactSubmissionStatus({ id: VALID_UUID, status: "contacted" })
+    ).rejects.toThrow("NEXT_REDIRECT:/admin/login");
+    expect(mocks.execute).not.toHaveBeenCalled();
+
+    mocks.requireAdmin.mockImplementationOnce(async () => {
+      callOrder.push("requireAdmin");
+      return {
+        user: {
+          id: "admin-42",
+          name: "Nguyễn Quản Trị",
+          email: "ADMIN@MocFarm.vn",
+        },
+        session: { id: "sess-1", userId: "admin-42", token: "secret-token" },
+      };
+    });
+
+    const updatedAt = new Date("2026-11-15T10:00:00.000Z");
+    mocks.execute.mockImplementationOnce(async () => {
+      callOrder.push("db.execute");
+      return {
+        rows: [
+          {
+            id: VALID_UUID,
+            status: "contacted",
+            updatedAt,
+            statusChanged: true,
+            auditLogId: "550e8400-e29b-41d4-a716-446655440111",
+          },
+        ],
+      };
+    });
+
+    const result = await updateContactSubmissionStatus({
+      id: VALID_UUID,
+      status: "contacted",
+    });
+
+    expect(callOrder).toEqual(["requireAdmin", "db.execute"]);
+    expect(result).toEqual({
+      ok: true,
+      data: { id: VALID_UUID, status: "contacted", updatedAt, changed: true },
+    });
+
+    const cteSql = pgDialect.sqlToQuery(
+      mocks.execute.mock.calls[0]?.[0] as SQL
+    );
+    expect(cteSql.sql).toContain("FOR UPDATE");
+    expect(cteSql.sql).toContain('"target_submission"."previous_status" <>');
+    expect(cteSql.sql).toContain('INSERT INTO "admin_audit_logs"');
+    expect(cteSql.sql).toContain("'status'");
+    expect(cteSql.sql).toContain("'from'");
+    expect(cteSql.sql).toContain("'to'");
+    expect(cteSql.params).toContain("admin-42");
+    expect(cteSql.params).toContain("Nguyễn Quản Trị");
+    expect(cteSql.params).toContain("admin@mocfarm.vn");
+    expect(cteSql.params).toContain("contact.status_changed");
+    expect(cteSql.params).toContain("contact_submission");
+    expect(cteSql.params).toContain(VALID_UUID);
+    expect(cteSql.params).not.toContain("secret-token");
+
+    // Trạng thái mới trùng với trạng thái hiện tại -> không cần auditLogId và changed = false
+    mocks.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: VALID_UUID,
+          status: "contacted",
+          updatedAt,
+          statusChanged: false,
+          auditLogId: null,
+        },
+      ],
+    });
+    const unchangedResult = await updateContactSubmissionStatus({
+      id: VALID_UUID,
+      status: "contacted",
+    });
+    expect(unchangedResult).toEqual({
+      ok: true,
+      data: { id: VALID_UUID, status: "contacted", updatedAt, changed: false },
+    });
+
+    // Bất thường: statusChanged = true nhưng không có auditLogId -> ném lỗi thay vì im lặng
+    mocks.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: VALID_UUID,
+          status: "resolved",
+          updatedAt,
+          statusChanged: true,
+          auditLogId: null,
+        },
+      ],
+    });
+    await expect(
+      updateContactSubmissionStatus({ id: VALID_UUID, status: "resolved" })
+    ).rejects.toThrow(
+      "Không thể ghi nhận nhật ký thay đổi trạng thái yêu cầu tư vấn."
+    );
+  });
 });
 

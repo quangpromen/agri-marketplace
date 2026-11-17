@@ -564,6 +564,48 @@ describe("admin notifications database queries (Drizzle + PgDialect)", () => {
       lastSeenAt: updatedAt.toISOString(),
       receiptsCreated: 3,
     });
+
+    // Chạy lặp lại khi không còn thông báo mới -> receiptsCreated = 0 và truyền snapshot actor chuẩn hóa
+    mocks.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          adminUserId: "admin-2",
+          lastSeenAt: updatedAt,
+          receiptsCreated: 0,
+          auditLogId: "550e8400-e29b-41d4-a716-446655440089",
+        },
+      ],
+    });
+
+    const repeatResult = await markAllAdminNotificationsSeen("admin-2", {
+      name: "  Quản\tTrị  ",
+      email: "  ADMIN@MocFarm.vn ",
+    });
+    expect(repeatResult).toEqual({
+      ok: true,
+      lastSeenAt: updatedAt.toISOString(),
+      receiptsCreated: 0,
+    });
+    const repeatSql = pgDialect.sqlToQuery(
+      mocks.execute.mock.calls[1]?.[0] as SQL
+    );
+    expect(repeatSql.params).toContain("Quản Trị");
+    expect(repeatSql.params).toContain("admin@mocfarm.vn");
+
+    // Nếu không có auditLogId trả về -> ném lỗi kiểm soát
+    mocks.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          adminUserId: "admin-2",
+          lastSeenAt: updatedAt,
+          receiptsCreated: 1,
+          auditLogId: null,
+        },
+      ],
+    });
+    await expect(markAllAdminNotificationsSeen("admin-2")).rejects.toThrow(
+      "Không thể cập nhật trạng thái đã xem thông báo."
+    );
   });
 
   it("từ chối adminUserId rỗng và không gọi DB", async () => {

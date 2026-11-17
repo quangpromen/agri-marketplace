@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   getSessionApi: vi.fn(),
   signInEmailApi: vi.fn(),
   signOutApi: vi.fn(),
+  dbInsert: vi.fn(),
+  captureOperationalError: vi.fn(),
   redirect: vi.fn((url: string) => {
     const error = new Error(`NEXT_REDIRECT:${url}`);
     (error as Error & { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};307;`;
@@ -21,7 +23,13 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("@/db/client", () => ({
-  db: {},
+  db: {
+    insert: mocks.dbInsert,
+  },
+}));
+
+vi.mock("@/server/observability/capture-error", () => ({
+  captureOperationalError: mocks.captureOperationalError,
 }));
 
 import { loginAdmin, logoutAdmin } from "@/actions/admin-auth";
@@ -195,9 +203,11 @@ describe("loginAdmin & logoutAdmin Server Actions", () => {
     process.env.BETTER_AUTH_URL = "http://localhost:3000";
 
     const authInstance = getAuth();
+    vi.spyOn(authInstance.api, "getSession").mockImplementation(mocks.getSessionApi);
     vi.spyOn(authInstance.api, "signInEmail").mockImplementation(mocks.signInEmailApi);
     vi.spyOn(authInstance.api, "signOut").mockImplementation(mocks.signOutApi);
 
+    mocks.getSessionApi.mockReset();
     mocks.signInEmailApi.mockReset();
     mocks.signOutApi.mockReset();
     mocks.redirect.mockClear();
@@ -282,11 +292,208 @@ describe("loginAdmin & logoutAdmin Server Actions", () => {
   });
 
   it("logoutAdmin gọi signOut để xóa session và redirect về /admin/login", async () => {
+    mocks.getSessionApi.mockResolvedValueOnce(null);
     mocks.signOutApi.mockResolvedValue({ success: true });
 
     await expect(logoutAdmin()).rejects.toThrow("NEXT_REDIRECT:/admin/login");
     expect(mocks.signOutApi).toHaveBeenCalledOnce();
     expect(mocks.redirect).toHaveBeenCalledWith("/admin/login");
+  });
+
+  it("ghi nhận audit cho đăng nhập thành công, sai mật khẩu, lỗi dịch vụ, đăng xuất và không ghi khi lỗi validation", async () => {
+    const setupAuditInsertSuccess = (auditId: string = "audit-row-1") => {
+      const returning = vi.fn().mockResolvedValue([{ id: auditId }]);
+      const values = vi.fn().mockReturnValue({ returning });
+      mocks.dbInsert.mockReturnValueOnce({ values });
+      return values;
+    };
+
+    mocks.dbInsert.mockReset();
+    mocks.captureOperationalError.mockReset();
+
+    const rawPassword = "ValidAdminPassword123!";
+    const rawSessionToken = "secret_session_tok_value_999";
+
+    // 1) Lỗi validation schema -> KHÔNG ghi audit log
+    const invalidForm = new FormData();
+    invalidForm.set("email", "not-an-email");
+    invalidForm.set("password", rawPassword);
+    const validationRes = await loginAdmin({ status: "idle" }, invalidForm);
+    expect(validationRes.status).toBe("validation_error");
+    expect(mocks.dbInsert).not.toHaveBeenCalled();
+
+    // 2) Đăng nhập thành công -> auth.login_succeeded với snapshot actor, không chứa password/token
+    const loginSuccessValues = setupAuditInsertSuccess("audit-login-ok");
+    mocks.signInEmailApi.mockResolvedValueOnce({
+      token: rawSessionToken,
+      user: {
+        id: "user_admin_1",
+        email: "ADMIN@MocFarm.vn",
+        name: "  Quản   Trị Viên ",
+      },
+    });
+    const validForm = new FormData();
+    validForm.set("email", "  ADMIN@MocFarm.vn ");
+    validForm.set("password", rawPassword);
+    validForm.set("callbackURL", "/admin/lien-he");
+
+    await expect(loginAdmin({ status: "idle" }, validForm)).rejects.toThrow(
+      "NEXT_REDIRECT:/admin/lien-he"
+    );
+    expect(loginSuccessValues).toHaveBeenCalledWith({
+      actorUserId: "user_admin_1",
+      actorNameSnapshot: "Quản Trị Viên",
+      actorEmailSnapshot: "admin@mocfarm.vn",
+      action: "auth.login_succeeded",
+      targetType: "admin_session",
+      targetId: null,
+      result: "success",
+      changes: null,
+      metadata: null,
+    });
+    expect(JSON.stringify(loginSuccessValues.mock.calls)).not.toContain(
+      rawPassword
+    );
+    expect(JSON.stringify(loginSuccessValues.mock.calls)).not.toContain(
+      rawSessionToken
+    );
+
+    // 3) Sai thông tin xác thực -> auth.login_failed (invalid_credentials), actorUserId = null
+    const loginFailValues = setupAuditInsertSuccess("audit-login-fail-1");
+    mocks.signInEmailApi.mockRejectedValueOnce({
+      statusCode: 401,
+      body: { code: "INVALID_EMAIL_OR_PASSWORD" },
+    });
+    const failState = await loginAdmin({ status: "idle" }, validForm);
+    expect(failState).toEqual({
+      status: "error",
+      message: GENERIC_INVALID_CREDENTIALS_MESSAGE,
+      submittedEmail: "admin@mocfarm.vn",
+    });
+    expect(loginFailValues).toHaveBeenCalledWith({
+      actorUserId: null,
+      actorNameSnapshot: null,
+      actorEmailSnapshot: "admin@mocfarm.vn",
+      action: "auth.login_failed",
+      targetType: "admin_session",
+      targetId: null,
+      result: "failure",
+      changes: null,
+      metadata: { reason: "invalid_credentials" },
+    });
+
+    // 4) Lỗi dịch vụ ngoài ý muốn -> auth.login_failed (auth_service_error), không lộ lỗi thô
+    const serviceErrValues = setupAuditInsertSuccess("audit-login-fail-2");
+    mocks.signInEmailApi.mockRejectedValueOnce(
+      new Error(`PGPASSWORD=leak token=${rawSessionToken}`)
+    );
+    const serviceErrState = await loginAdmin({ status: "idle" }, validForm);
+    expect(serviceErrState).toEqual({
+      status: "error",
+      message: GENERIC_AUTH_SERVICE_ERROR_MESSAGE,
+      submittedEmail: "admin@mocfarm.vn",
+    });
+    expect(serviceErrValues).toHaveBeenCalledWith({
+      actorUserId: null,
+      actorNameSnapshot: null,
+      actorEmailSnapshot: "admin@mocfarm.vn",
+      action: "auth.login_failed",
+      targetType: "admin_session",
+      targetId: null,
+      result: "failure",
+      changes: null,
+      metadata: { reason: "auth_service_error" },
+    });
+    expect(JSON.stringify(serviceErrValues.mock.calls)).not.toContain(
+      "PGPASSWORD"
+    );
+
+    // 5) Đăng xuất lấy actor từ session TRƯỚC khi gọi signOut
+    const logoutCallOrder: string[] = [];
+    const now = Date.now();
+    mocks.getSessionApi.mockImplementationOnce(async () => {
+      logoutCallOrder.push("getSession");
+      return {
+        user: {
+          id: "user_admin_1",
+          email: "admin@mocfarm.vn",
+          name: "Quản Trị Viên",
+          emailVerified: true,
+          createdAt: new Date(now),
+          updatedAt: new Date(now),
+        },
+        session: {
+          id: "sess_secret_999",
+          userId: "user_admin_1",
+          token: rawSessionToken,
+          expiresAt: new Date(now + 60_000),
+          createdAt: new Date(now),
+          updatedAt: new Date(now),
+        },
+      };
+    });
+    mocks.signOutApi.mockImplementationOnce(async () => {
+      logoutCallOrder.push("signOut");
+      return { success: true };
+    });
+    const logoutValues = setupAuditInsertSuccess("audit-logout-ok");
+
+    await expect(logoutAdmin()).rejects.toThrow("NEXT_REDIRECT:/admin/login");
+    expect(logoutCallOrder).toEqual(["getSession", "signOut"]);
+    expect(logoutValues).toHaveBeenCalledWith({
+      actorUserId: "user_admin_1",
+      actorNameSnapshot: "Quản Trị Viên",
+      actorEmailSnapshot: "admin@mocfarm.vn",
+      action: "auth.logout_succeeded",
+      targetType: "admin_session",
+      targetId: null,
+      result: "success",
+      changes: null,
+      metadata: null,
+    });
+    expect(JSON.stringify(logoutValues.mock.calls)).not.toContain(
+      "sess_secret_999"
+    );
+    expect(JSON.stringify(logoutValues.mock.calls)).not.toContain(
+      rawSessionToken
+    );
+
+    // 6) Lỗi lưu audit best-effort không làm hỏng login hoặc logout và không làm lộ secret vào Sentry
+    mocks.signInEmailApi.mockResolvedValueOnce({
+      token: rawSessionToken,
+      user: {
+        id: "user_admin_1",
+        email: "admin@mocfarm.vn",
+        name: "Admin",
+      },
+    });
+    mocks.dbInsert.mockReturnValueOnce({
+      values: vi.fn().mockReturnValue({
+        returning: vi
+          .fn()
+          .mockRejectedValue(
+            new Error(`DB down password=${rawPassword} token=${rawSessionToken}`)
+          ),
+      }),
+    });
+
+    await expect(loginAdmin({ status: "idle" }, validForm)).rejects.toThrow(
+      "NEXT_REDIRECT:/admin/lien-he"
+    );
+    expect(mocks.captureOperationalError).toHaveBeenCalledTimes(1);
+    const capturedErr = mocks.captureOperationalError.mock.calls[0]?.[0] as Error;
+    expect(capturedErr.message).not.toContain(rawPassword);
+    expect(capturedErr.message).not.toContain(rawSessionToken);
+
+    mocks.getSessionApi.mockResolvedValueOnce(null);
+    mocks.signOutApi.mockResolvedValueOnce({ success: true });
+    mocks.dbInsert.mockReturnValueOnce({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockRejectedValue(new Error("DB timeout")),
+      }),
+    });
+    await expect(logoutAdmin()).rejects.toThrow("NEXT_REDIRECT:/admin/login");
+    expect(mocks.captureOperationalError).toHaveBeenCalledTimes(2);
   });
 });
 
